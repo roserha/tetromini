@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "graphics.h"
+#include "sprites.h"
 
 int main(void)
 {
@@ -11,16 +12,21 @@ int main(void)
 	gfx_playfield();
 
 	// t block
-	gfx_block(3, 2, 0);
-	gfx_block(4, 2, 0);
-	gfx_block(5, 2, 0);
-	gfx_block(4, 3, 0);
+	sprite_draw_block(3, 3, 0);
+	sprite_draw_block(4, 3, 0);
+	sprite_draw_block(5, 3, 0);
+	sprite_draw_block(4, 2, 0);
 
 	// full line
 	for (int i = 0; i < 10; i++)
 	{
-		gfx_block(i, 17, i % 7);
+		sprite_draw_block(i, 17, i % 7);
 	}
+
+	// text test
+	sprite_draw_text(121, 1, "Score: 12345678");
+	sprite_draw_text(113, 1, "Lvl: 123");
+	sprite_draw_text(113, 34, "Next: #");
 
 	gfx_flush();
 
