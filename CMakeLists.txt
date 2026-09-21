@@ -16,7 +16,9 @@ target_include_directories(app PRIVATE src/inc)
 target_sources(app PRIVATE
   src/main.c
   src/graphics.c
+  src/playfield.c
   src/sprites.c
+  src/tetromino.c
 )
 
 add_dependencies(app run_python_script)

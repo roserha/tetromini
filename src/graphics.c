@@ -40,11 +40,11 @@ void gfx_px(uint8_t x, uint8_t y, bool on)
 {
     // Framebuffer y coordinate's direction inside pages is reversed.
     // As such, we need to flip the last 8 bits to properly target the bit
-    uint8_t y_adj = y ^ 0b111;
-    if (x >= GFX_W || y_adj >= GFX_H) return;
+    uint8_t y_adjusted = y ^ 0b111;
+    if (x >= GFX_W || y_adjusted >= GFX_H) return;
 
-    size_t idx  = (y_adj / 8) * GFX_W + x;   /* which page, then which column */
-    uint8_t bit = BIT(y_adj % 8);           /* which row inside the page     */
+    size_t idx  = (y_adjusted >> 3) * GFX_W + x;   /* which page, then which column */
+    uint8_t bit = BIT(y_adjusted & 7);           /* which row inside the page     */
 
     if (on) {
         fb[idx] |= bit;

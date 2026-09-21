@@ -14,7 +14,6 @@ docker run \
   -v /tftpboot:/tftpboot \
   -v "$(pwd):/home/zephyr/applications" \
   -v /dev:/dev \
-  -v "/run/media/$(whoami):/run/media/zephyr" \
   -v ~/.config/nvim:/home/zephyr/.config/nvim \
   -v ~/.local/share/nvim:/home/zephyr/.local/share/nvim \
   -v ~/.local/state/nvim:/home/zephyr/.local/state/nvim \

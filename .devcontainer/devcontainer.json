@@ -38,11 +38,9 @@
 
     // usb / serial, for when the feather shows up
     "source=/dev,target=/dev,type=bind",
-    "source=${localEnv:HOME}/.devcontainer-media,target=/run/media/zephyr,type=bind",
 
     // lazyvim config + state
     "source=${localEnv:HOME}/.config/nvim,target=/home/zephyr/.config/nvim,type=bind",
-    "source=${localEnv:HOME}/.local/share/nvim,target=/home/zephyr/.local/share/nvim,type=bind",
     "source=${localEnv:HOME}/.local/state/nvim,target=/home/zephyr/.local/state/nvim,type=bind"
   ],
 

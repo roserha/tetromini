@@ -7,6 +7,9 @@
  * x=0 is the top of the playfield, y=0 is the left edge.
  */
 
+ // Given the color resolution, our frame buffer should occupy ~1.024KB of SRAM, since
+ // each pixel is stored as a single bit instead of a byte!
+
 #include <stdbool.h>
 #include <stdint.h>
 
