@@ -44,7 +44,7 @@ void gfx_rect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bo
 // on: pixel color (black or white)
 void gfx_fill(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on);
 
-// Flushes display
+// Flushes frame buffer to display
 int  gfx_flush(void);
 
 // Draws playfield bounds

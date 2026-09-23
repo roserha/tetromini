@@ -20,4 +20,7 @@ void playfield_update_occupied();
 // Renders active playfield
 void playfield_render();
 
+// Renders current info (score, level, next piece)
+void playfield_print_header();
+
 #endif

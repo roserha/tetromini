@@ -18,6 +18,11 @@ void tetromino_draw(uint_fast8_t x, uint_fast8_t y, Tetromino block_type, Spin s
         return;
     }
 
+    // The following approach was developed as an attempt to speed up calculating
+    // shifted vectors based on a rotation matrix! The math is really really
+    // unintuitive but it works kinda! Miiiight be subject to change if it turns out
+    // to not actually work haha.
+
     // Taken from spin state
     uint_fast8_t flip = spin_state & 1;
     uint_fast8_t negate = spin_state & 2;

@@ -26,7 +26,7 @@ int  gfx_init(void)
     return 0;
 }
 
-// Clears the buffer
+// Clears the buffer by filling it with 0s
 void gfx_clear(void)
 {
     memset(fb, 0, sizeof(fb)); 
@@ -74,6 +74,9 @@ void gfx_rect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bo
     for (uint_fast8_t i = x; i < xpw; i++)
     {
         gfx_px(i, y, on);
+    }
+    for (uint_fast8_t i = x; i < xpw; i++)
+    {
         gfx_px(i, yphm1, on);
     }
 
@@ -81,6 +84,9 @@ void gfx_rect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bo
     for (uint_fast8_t j = y + 1; j < yphm1; j++)
     {
         gfx_px(x, j, on);
+    }
+    for (uint_fast8_t j = y + 1; j < yphm1; j++)
+    {
         gfx_px(xpwm1, j, on);
     }
 }
@@ -105,7 +111,7 @@ void gfx_fill(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bo
     }
 }
 
-// Flushes display
+// Flushes frame buffer to display
 int  gfx_flush(void)
 {
     display_write(disp, 0, 0, &desc, fb);

@@ -20,11 +20,6 @@ int main(void)
 
 	playfield_update_occupied();
 
-	// text test
-	sprite_draw_text(121, 1, "Score: 12345678");
-	sprite_draw_text(113, 1, "Lvl: 123");
-	sprite_draw_text(113, 34, "Next: #");
-
 	int64_t time = k_uptime_get();
 	int64_t start_time = time;
 	int64_t old_time = time;
@@ -34,6 +29,12 @@ int main(void)
 	{
 		// Delta time calculations
 		old_time = time;
+
+		// Override frame
+		gfx_clear();
+
+		// Draw header info
+		playfield_print_header();
 		
 		// Draw current playfield
 		playfield_render();
@@ -45,6 +46,7 @@ int main(void)
 		Spin rotate_dir = spins[rotate % 4];
 		tetromino_draw(4, 3, (rotate >> 2) % 7, rotate_dir);
 		
+		// Update delta_time and wait for next framedraw time
 		time = k_uptime_get();
 		delta_time = time - old_time;
 		int64_t frame_sleep_time = 17 - delta_time;

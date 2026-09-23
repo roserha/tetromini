@@ -55,8 +55,7 @@ void playfield_update_occupied()
 // Renders active playfield
 void playfield_render()
 {
-    // Erase old playfield
-    gfx_fill(1, 1, 110, 62, false);
+    // Draw playfield bounds
     gfx_playfield();
 
     // Draw individual playfields
@@ -90,4 +89,12 @@ void playfield_render()
             }
         }
     }
+}
+
+// Renders current info (score, level, next piece)
+void playfield_print_header()
+{
+    sprite_draw_text(121, 1, "Score: 12345678");
+	sprite_draw_text(113, 1, "Lvl: 123");
+	sprite_draw_text(113, 34, "Next: #");
 }
