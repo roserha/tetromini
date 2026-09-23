@@ -7,7 +7,7 @@
 // y:          y coordinate
 // block_type: which block to draw
 // spin_state: how the block is spinning
-void tetromino_draw(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state)
+void tetromino_draw(uint_fast8_t x, uint_fast8_t y, Tetromino block_type, Spin spin_state)
 {
     if (block_type == OBlock)
     {
@@ -19,16 +19,16 @@ void tetromino_draw(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state)
     }
 
     // Taken from spin state
-    uint8_t flip = spin_state & 1;
-    uint8_t negate = spin_state & 2;
+    uint_fast8_t flip = spin_state & 1;
+    uint_fast8_t negate = spin_state & 2;
 
     // n ^ flip means we want n when not flipped and ~n when flipped
     // (1 - negate) means we want *1 when not negated and *-1 when negated
     // (-1 + negate) means we want *-1 when not negated and *1 when negated
 
     // Subdirections for going above central block based on spin state
-    int8_t dir_up_x = (0 ^ flip) * ( 1 - negate);
-    int8_t dir_up_y = (1 ^ flip) * ( 1 - negate);
+    uint_fast8_t dir_up_x = (0 ^ flip) * ( 1 - negate);
+    uint_fast8_t dir_up_y = (1 ^ flip) * ( 1 - negate);
 
     // Subdirections for going below central block based on spin state
     // these ones arent used but let's keep it here just in case
@@ -36,12 +36,12 @@ void tetromino_draw(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state)
     // int8_t dir_down_y = (1 ^ flip) * (-1 + negate);
 
     // Subdirections for going left of central block based on spin state
-    int8_t dir_left_x = (1 ^ flip) * (-1 + negate);
-    int8_t dir_left_y = (0 ^ flip) * ( 1 - negate);
+    uint_fast8_t dir_left_x = (1 ^ flip) * (-1 + negate);
+    uint_fast8_t dir_left_y = (0 ^ flip) * ( 1 - negate);
     
     // Subdirections for going right of central block based on spin state
-    int8_t dir_right_x = (1 ^ flip) * ( 1 - negate);
-    int8_t dir_right_y = (0 ^ flip) * (-1 + negate);
+    uint_fast8_t dir_right_x = (1 ^ flip) * ( 1 - negate);
+    uint_fast8_t dir_right_y = (0 ^ flip) * (-1 + negate);
 
     switch (block_type)
     {

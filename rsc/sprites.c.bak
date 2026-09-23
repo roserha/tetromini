@@ -128,7 +128,7 @@ const uint8_t sprite_array[728] = {
 // y:  y coordinate
 //
 // Returns horizontal resolution of the drawn sprite
-uint8_t sprite_draw(uint8_t sprite_id, uint8_t x, uint8_t y) 
+uint8_t sprite_draw(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y) 
 {
     if (sprite_id >= SPRITE_NUM)
     {
@@ -156,12 +156,12 @@ uint8_t sprite_draw(uint8_t sprite_id, uint8_t x, uint8_t y)
 // x:  x coordinate
 // y:  y coordinate
 // block_type: which block to draw based on block enum ids
-void sprite_draw_block(int8_t x, int8_t y, uint8_t block_type)
+void sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
 {
     if (x >= 10 || y >= 18) { return; }
 
-    uint8_t x_raw = y * 6 + 2;
-    uint8_t y_raw = x * 6 + 2;
+    uint_fast8_t x_raw = y * 6 + 2;
+    uint_fast8_t y_raw = x * 6 + 2;
 
     if (block_type < 7)
     {
@@ -177,10 +177,10 @@ void sprite_draw_block(int8_t x, int8_t y, uint8_t block_type)
 // x:        x coordinate
 // y:        y coordinate
 // sentence: *null-terminated* string
-void sprite_draw_text(uint8_t x, uint8_t y, char *sentence)
+void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
 {
-    uint8_t index = 0;
-    uint8_t caret_distance = 0;
+    uint_fast8_t index = 0;
+    uint_fast8_t caret_distance = 0;
     while(sentence[index] != '\0')
     {
         int char_code = (int)sentence[index];

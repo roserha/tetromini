@@ -36,15 +36,15 @@ void gfx_clear(void)
 // x:  x coordinate
 // y:  y coordinate
 // on: pixel color (black or white)
-void gfx_px(uint8_t x, uint8_t y, bool on)
+void gfx_px(uint_fast8_t x, uint_fast8_t y, bool on)
 {
     // Framebuffer y coordinate's direction inside pages is reversed.
     // As such, we need to flip the last 8 bits to properly target the bit
-    uint8_t y_adjusted = y ^ 0b111;
+    uint_fast8_t y_adjusted = y ^ 0b111;
     if (x >= GFX_W || y_adjusted >= GFX_H) return;
 
     size_t idx  = (y_adjusted >> 3) * GFX_W + x;   /* which page, then which column */
-    uint8_t bit = BIT(y_adjusted & 7);           /* which row inside the page     */
+    uint_fast8_t bit = BIT(y_adjusted & 7);           /* which row inside the page     */
 
     if (on) {
         fb[idx] |= bit;
@@ -59,21 +59,26 @@ void gfx_px(uint8_t x, uint8_t y, bool on)
 // w: width
 // h: height
 // on: pixel color (black or white)
-void gfx_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on)
+void gfx_rect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on)
 {
-    uint8_t xpw = x + w;
-    uint8_t xpwm1 = x + w - 1;
-    uint8_t yphm1 = y + h - 1;
+    if (w == 0 || h == 0)
+    {
+        return;
+    }
+
+    uint_fast8_t xpw = x + w;
+    uint_fast8_t xpwm1 = x + w - 1U;
+    uint_fast8_t yphm1 = y + h - 1U;
 
     // Horizontal lines
-    for (uint8_t i = x; i < xpw; i++)
+    for (uint_fast8_t i = x; i < xpw; i++)
     {
         gfx_px(i, y, on);
         gfx_px(i, yphm1, on);
     }
 
     // Vertical lines
-    for (uint8_t j = y + 1; j < yphm1; j++)
+    for (uint_fast8_t j = y + 1; j < yphm1; j++)
     {
         gfx_px(x, j, on);
         gfx_px(xpwm1, j, on);
@@ -86,14 +91,14 @@ void gfx_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on)
 // w: width
 // h: height
 // on: pixel color (black or white)
-void gfx_fill(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on)
+void gfx_fill(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on)
 {
-    uint8_t xpw = x + w;
-    uint8_t yph = y + h;
+    uint_fast8_t xpw = x + w;
+    uint_fast8_t yph = y + h;
 
-    for (uint8_t i = x; i < xpw; i++)
+    for (uint_fast8_t i = x; i < xpw; i++)
     {
-        for (uint8_t j = y; j < yph; j++)
+        for (uint_fast8_t j = y; j < yph; j++)
         {
             gfx_px(i,j,on);
         }

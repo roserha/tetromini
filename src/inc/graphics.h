@@ -26,7 +26,7 @@ void gfx_clear(void);
 // x:  x coordinate
 // y:  y coordinate
 // on: pixel color (black or white)
-void gfx_px(uint8_t x, uint8_t y, bool on);
+void gfx_px(uint_fast8_t x, uint_fast8_t y, bool on);
 
 // Draws a w-x-h unfilled rect at x and y of color on using transposed coordinate system
 // x:  x coordinate
@@ -34,7 +34,7 @@ void gfx_px(uint8_t x, uint8_t y, bool on);
 // w: width
 // h: height
 // on: pixel color (black or white)
-void gfx_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on);
+void gfx_rect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on);
 
 // Draws a w-x-h filled rect at x and y of color on using transposed coordinate system
 // x:  x coordinate
@@ -42,7 +42,7 @@ void gfx_rect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on);
 // w: width
 // h: height
 // on: pixel color (black or white)
-void gfx_fill(uint8_t x, uint8_t y, uint8_t w, uint8_t h, bool on);
+void gfx_fill(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on);
 
 // Flushes display
 int  gfx_flush(void);

@@ -12,11 +12,6 @@ int main(void)
 
 	gfx_init();
 
-	gfx_playfield();
-
-	// t block
-	tetromino_draw(4, 3, TBlock, ZeroDeg);
-
 	// full line
 	for (int i = 0; i < 10; i++)
 	{
@@ -33,7 +28,7 @@ int main(void)
 	int64_t time = k_uptime_get();
 	int64_t start_time = time;
 	int64_t old_time = time;
-	int16_t delta_time = 0;
+	int64_t delta_time = 0;
 
 	while (true)
 	{
@@ -52,11 +47,12 @@ int main(void)
 		
 		time = k_uptime_get();
 		delta_time = time - old_time;
-		int16_t frame_sleep_time = 17 - delta_time;
+		int64_t frame_sleep_time = 17 - delta_time;
 		
 		if (frame_sleep_time > 0)
 		{
-			k_sleep(K_MSEC(frame_sleep_time)); // Sleep for ~60hz
+			k_timeout_t timeout = K_MSEC(frame_sleep_time);
+			k_sleep(timeout); // Sleep for ~60hz
 		}
 		
 		// Refresh screen and wait for next frame (if we finished early)

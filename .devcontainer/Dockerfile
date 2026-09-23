@@ -35,7 +35,7 @@ RUN \
           curl libtinfo6 unzip zip \
           ninja-build gperf device-tree-compiler \
           python3-dev python3-venv xz-utils file make \
-          gcc gcc-multilib libsdl2-dev libmagic1 && \
+          gcc gcc-multilib libsdl2-dev libmagic1 gdb && \
         rm -rf /var/lib/apt/lists/* && \
         echo "dash dash/sh boolean false" | debconf-set-selections && \
         dpkg-reconfigure dash
