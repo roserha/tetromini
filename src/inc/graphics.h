@@ -26,7 +26,8 @@ void gfx_clear(void);
 // x:  x coordinate
 // y:  y coordinate
 // on: pixel color (black or white)
-void gfx_px(uint_fast8_t x, uint_fast8_t y, bool on);
+// Returns false if pixel is out of bounds
+bool gfx_px(uint_fast8_t x, uint_fast8_t y, bool on);
 
 // Draws a w-x-h unfilled rect at x and y of color on using transposed coordinate system
 // x:  x coordinate

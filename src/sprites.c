@@ -84,13 +84,13 @@ const uint8_t sprite_array[728] = {
     4, 0b000110, 0b101001, 0b101001, 0b011110, 0b000000, 0b000000,
     1, 0b101111, 0b000000, 0b000000, 0b000000, 0b000000, 0b000000,
     3, 0b000010, 0b101001, 0b000110, 0b000000, 0b000000, 0b000000,
-    6, 0b001100, 0b001100, 0b111100, 0b111100, 0b001100, 0b001100,
-    4, 0b111111, 0b111111, 0b110000, 0b110000, 0b000000, 0b000000,
-    4, 0b110000, 0b110000, 0b111111, 0b111111, 0b000000, 0b000000,
-    4, 0b111100, 0b111100, 0b111100, 0b111100, 0b000000, 0b000000,
-    6, 0b110000, 0b110000, 0b111100, 0b111100, 0b001100, 0b001100,
-    6, 0b001100, 0b001100, 0b111100, 0b111100, 0b110000, 0b110000,
+    6, 0b000110, 0b000110, 0b011110, 0b011110, 0b000110, 0b000110,
+    5, 0b000000, 0b011110, 0b011110, 0b011110, 0b011110, 0b000000,
     6, 0b110000, 0b111000, 0b011100, 0b001110, 0b000111, 0b000011,
+    6, 0b000110, 0b000110, 0b011110, 0b011110, 0b011000, 0b011000,
+    6, 0b011000, 0b011000, 0b011110, 0b011110, 0b000110, 0b000110,
+    5, 0b000000, 0b111111, 0b111111, 0b110000, 0b110000, 0b000000,
+    5, 0b000000, 0b110000, 0b110000, 0b111111, 0b111111, 0b000000,
     1, 0b110011, 0b000000, 0b000000, 0b000000, 0b000000, 0b000000,
     3, 0b110000, 0b001100, 0b000011, 0b000000, 0b000000, 0b000000,
     3, 0b000011, 0b001100, 0b110000, 0b000000, 0b000000, 0b000000,
@@ -156,9 +156,9 @@ uint8_t sprite_draw(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y)
 // x:  x coordinate
 // y:  y coordinate
 // block_type: which block to draw based on block enum ids
-void sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
+bool sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
 {
-    if (x >= 10 || y >= 18) { return; }
+    if (x >= 10 || y >= 18) { return false; }
 
     uint_fast8_t x_raw = y * 6 + 2;
     uint_fast8_t y_raw = x * 6 + 2;
@@ -171,6 +171,8 @@ void sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
     {
         gfx_fill(x_raw, y_raw, 6, 6, false);
     }
+
+    return true;
 }
 
 // Writes text using sprites at specified coordinate using transposed coordinate system
@@ -184,19 +186,19 @@ void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
     while(sentence[index] != '\0')
     {
         int char_code = (int)sentence[index];
-        if (char_code > 64 && char_code < 91)
+        if (char_code > 64 && char_code < 91) // Upper case letters
         {
             caret_distance += 1 + sprite_draw(char_code - 58, x, y + caret_distance);
         }
-        else if (char_code > 96 && char_code < 123)
+        else if (char_code > 96 && char_code < 123) // Lower case letters
         {
             caret_distance += 1 + sprite_draw(char_code - 64, x, y + caret_distance);
         }
-        else if (char_code > 47 && char_code < 58)
+        else if (char_code > 47 && char_code < 58) // 0-9 digits
         {
             caret_distance += 1 + sprite_draw(char_code + 11, x, y + caret_distance);
         }
-        else if (char_code == 32)
+        else if (char_code == 32) // Space
         {
             caret_distance += 3;
         }
@@ -261,11 +263,47 @@ void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
                 default:
                     sprite_code = 70;
                     break;
-                }
-
-                caret_distance += 1 + sprite_draw(sprite_code, x, y + caret_distance);
             }
-            
-            index++;
+
+            caret_distance += 1 + sprite_draw(sprite_code, x, y + caret_distance);
         }
+            
+        index++;
     }
+}
+
+void sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base)
+{
+    int32_t remainder = number;
+    uint_fast8_t caret_distance = 0;
+    uint32_t digit_count = 0;
+
+    uint8_t char_ids[32] = {59};
+
+    if (base > 62)
+    {
+        return;
+    }
+
+    if (remainder < 0)
+    {
+        caret_distance += 1 + sprite_draw(89, x, y + caret_distance);
+        remainder *= -1;
+    } else if (remainder == 0)
+    {
+        digit_count = 1;
+    }
+
+    while (remainder != 0 && digit_count < 32)
+    {
+        uint_fast8_t digit_value = remainder % base;
+    
+        char_ids[digit_count++] = ((digit_value + 52) % 62) + 7; // Start with 0-9, then cycle back to capital letters, based on sprite IDs.
+        remainder = remainder / base;
+    }
+
+    for (int i = digit_count - 1; i >= 0; i--)
+    {
+        caret_distance += 1 + sprite_draw(char_ids[i], x, y + caret_distance);
+    }
+}

@@ -27,11 +27,20 @@ typedef enum{
     TwoSeventyDeg = 0b01
 } Spin;
 
+// Determines the x and y positions of all four blocks of a tetromino
+// x:          x coordinate
+// y:          y coordinate
+// block_type: which block to draw
+// spin_state: how the block is spinning
+// positions:  8-long array of coordinates
+void tetromino_get_positions(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state, uint8_t *positions);
+
 // Draws tetrimino with the central block at (x,y) using tetrimino coordinate system
 // x:          x coordinate
 // y:          y coordinate
 // block_type: which block to draw
 // spin_state: how the block is spinning
-void tetromino_draw(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state);
+// Returns false if a block was out of bounds
+bool tetromino_draw(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state);
 
 #endif

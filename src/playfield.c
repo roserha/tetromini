@@ -1,5 +1,6 @@
 #include "playfield.h"
 #include <stdio.h>
+#include <zephyr/random/random.h>
 
 // We will keep track of the active playfield by borrowing bitboards from chess!!
 
@@ -13,6 +14,15 @@
 // Each playfield is 7 bytes across from each other, so you can either pick (+ 224*b) or just add 7 * b later
 
 uint32_t Playfield [56] = {0};
+uint32_t Score = 0;
+uint_fast8_t Level = 1;
+uint_fast8_t seen_pieces = 0;
+Tetromino nextPiece = TBlock;
+Tetromino currentPiece = TBlock;
+Spin currentSpinState = ZeroDeg;
+uint_fast8_t pieceXPos = 7;
+uint_fast8_t pieceYPos = 20;
+int64_t stopwatch = 0;
 
 // Set state of block on bitfield based on tetrimino-coordinates
 // x:          x coordinate
@@ -94,7 +104,158 @@ void playfield_render()
 // Renders current info (score, level, next piece)
 void playfield_print_header()
 {
-    sprite_draw_text(121, 1, "Score: 12345678");
-	sprite_draw_text(113, 1, "Lvl: 123");
-	sprite_draw_text(113, 34, "Next: #");
+    sprite_draw_text(121, 1, "Score:");
+    sprite_draw_number(121, 29, Score, 10);
+	sprite_draw_text(113, 1, "Lvl:");
+    sprite_draw_number(113, 18, Level, 10);
+	sprite_draw_text(113, 34, "Next:");
+    sprite_draw(71 + ((int)nextPiece), 113, 57);
+}
+
+// Pull a random tetromino from the bag
+Tetromino playfield_get_new_piece()
+{
+    bool foundPiece = false;
+    Tetromino piece = TBlock;
+
+    if (seen_pieces == 0b1111111)
+    {
+        // We've seen all pieces, let's refresh bag
+        seen_pieces = 0;
+    }
+
+    while (!foundPiece)
+    {
+        uint_fast8_t rand = sys_rand8_get() & 0b1111111;
+
+        // Filter out pieces we've seen
+        rand &= ~seen_pieces;
+
+        if (rand != 0 && rand != 0b10000000)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                uint_fast8_t pieceCheckIndex = 1U << i;
+                if ((rand & pieceCheckIndex) != 0)
+                {
+                    foundPiece = true;
+                    piece = (Tetromino)i;
+                    seen_pieces |= pieceCheckIndex;
+                    break;
+                }
+            }
+        }
+    }
+
+    return piece;
+}
+
+// Initializes playfield variables
+void playfield_init()
+{
+    // Initialize us at a random state of seen pieces
+    seen_pieces = sys_rand8_get() & 0b1111111;
+    
+    currentPiece = playfield_get_new_piece();
+    nextPiece = playfield_get_new_piece();
+    
+}
+
+// Check for collision of a hypothetical tetromino
+// Returns true if collision happens
+bool playfield_check_collision(Tetromino block_type, Spin spin_state, uint_fast8_t x, uint_fast8_t y)
+{
+    uint8_t Coordinates[8] = {0};
+    
+    tetromino_get_positions(x, y, block_type, spin_state, Coordinates);
+
+    // Simpler collision: colliding with walls (horizontally or bottom)
+    for (int i = 0; i < 7; i ++)
+    {
+        if ((i & 1) == 0) // Checking x
+        {
+            if (Coordinates[i] > 10)
+            {
+                return true;
+            }
+        }
+        else // Checking y
+        {
+            if (Coordinates[i] > 25)
+            {
+                return true;
+            }
+        }
+    }
+
+    // Harder collision: colliding with existing playfields
+    // Transform x and y array into array coordinates
+
+    uint32_t block_array_coords [4] = { (Coordinates[0] + Coordinates[1]*10),
+                                        (Coordinates[2] + Coordinates[3]*10),
+                                        (Coordinates[4] + Coordinates[5]*10),
+                                        (Coordinates[6] + Coordinates[7]*10)};
+
+    for (int i = 0; i < 4; i++)
+    {
+        // Check if coordinate we're looking at is set to occupied
+
+        uint32_t arrayRow = 1 << (block_array_coords[i] & 31); // % 32
+        size_t arrayColumn = block_array_coords[i] >> 5;       // / 32
+
+        uint32_t columnToCheck = Playfield[arrayColumn + 49];
+
+        if ((columnToCheck & arrayRow) != 0)
+        {
+            return true;
+        }
+    }
+
+    // No collisions here!
+    return false;
+}
+
+// Update current playfield status
+void playfield_tick(int64_t delta_time, int64_t elapsed_time)
+{
+    if (elapsed_time == 0)
+    {
+        return;
+    }
+
+    Score = elapsed_time;
+    Level = delta_time;
+
+    if (elapsed_time - stopwatch > 300)
+    {
+        bool willItCollide = playfield_check_collision(currentPiece, currentSpinState, pieceXPos, pieceYPos - 1);
+        
+        if (!willItCollide)
+        {
+            pieceYPos--;
+            stopwatch = elapsed_time;
+        }
+
+        else
+        {
+            // Set playfield to have new blocks
+            uint8_t Coordinates[8] = {0};
+    
+            tetromino_get_positions(pieceXPos, pieceYPos, currentPiece, currentSpinState, Coordinates);
+
+            for (int i = 0; i < 8; i+=2)
+            {
+                playfield_set_state(Coordinates[i], Coordinates[i+1], currentPiece, true);
+            }
+
+            playfield_update_occupied();
+
+            pieceXPos = 7;
+            pieceYPos = 20;
+            currentPiece = nextPiece;
+            nextPiece = playfield_get_new_piece();
+        }
+    }
+
+    tetromino_draw(pieceXPos, pieceYPos, currentPiece, currentSpinState);
 }

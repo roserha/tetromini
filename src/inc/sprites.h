@@ -34,11 +34,20 @@ uint8_t sprite_draw(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y);
 // x:  x coordinate
 // y:  y coordinate
 // block_type: which block to draw based on block enum ids
-void sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type);
+// Returns false if out of bounds
+bool sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type);
 
 // Writes text using sprites at specified coordinate using transposed coordinate system
 // x:        x coordinate
 // y:        y coordinate
 // sentence: *null-terminated* string
 void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence);
+
+// Writes number using sprites at specified coordinate using transposed coordinate system
+// x:        x coordinate
+// y:        y coordinate
+// number:   number to print
+// base:     base to print the number at
+void sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base);
+
 #endif
