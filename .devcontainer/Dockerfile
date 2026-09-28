@@ -7,6 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates wget && \
         rm -rf /var/lib/apt/lists/*
 
+# segger j-link software pack (gdb server, JLinkExe, rtt tools)
+RUN wget -q --post-data "accept_license_agreement=accepted&non_emb_ctr=confirmed&submit=Download+software" \
+        -O /tmp/jlink.deb https://www.segger.com/downloads/jlink/JLink_Linux_x86_64.deb && \
+    apt-get update && \
+    dpkg --unpack /tmp/jlink.deb && \
+    rm -f /var/lib/dpkg/info/jlink.postinst && \
+    apt-get install -yf --no-install-recommends && \
+    rm -rf /tmp/jlink.deb /var/lib/apt/lists/*
+
 # download cmake
 RUN wget -qO- "https://github.com/Kitware/CMake/releases/download/v3.31.12/cmake-3.31.12-linux-x86_64.tar.gz" \
         | tar --strip-components=1 -xz -C /usr/local/

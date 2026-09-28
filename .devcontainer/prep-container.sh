@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# WARNING: YOU NEED TO RUN THE FOLLWOING COMMAND TO LINK JLINK THINGS
+# TO THE INSIDE OF THE CONTAINER
+# echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="1366", MODE="0666"' \
+#   | sudo tee /etc/udev/rules.d/99-jlink.rules
+# sudo udevadm control --reload-rules && sudo udevadm trigger
+
 # prep neovim folders for lazyvim!
 mkdir -p ~/.config/nvim ~/.local/share/nvim ~/.local/state/nvim
 xhost +SI:localuser:"$(id -un)" > /dev/null

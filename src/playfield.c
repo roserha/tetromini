@@ -321,8 +321,6 @@ void playfield_hard_drop()
     playfield_finish_drop();
 }
 
-
-
 // Update phantom tetromino Y Pos
 void playfield_update_phantom()
 {

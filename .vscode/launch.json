@@ -43,6 +43,39 @@
             ],
             "miDebuggerPath": "/usr/bin/gdb",
             "preLaunchTask": "Build Feather UF2"
+        },
+
+        {
+            "name": "Feather Debug (J-Link)",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "jlink",
+            "device": "nRF52840_xxAA",
+            "interface": "swd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/feather/zephyr/zephyr.elf",
+            "gdbPath": "/workspace/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "runToEntryPoint": "main",
+            "preLaunchTask": "Build Feather",
+            "svdFile": "/workspace/modules/hal/nordic/nrfx/bsp/stable/mdk/nrf52840.svd",
+            "rttConfig": {
+                "enabled": true,
+                "address": "auto",
+                "decoders": [{ "label": "rtt", "port": 0, "type": "console" }]
+            }
+        },
+        
+        {
+            "name": "Feather Attach (J-Link)",
+            "type": "cortex-debug",
+            "request": "attach",
+            "servertype": "jlink",
+            "device": "nRF52840_xxAA",
+            "interface": "swd",
+            "cwd": "${workspaceFolder}",
+            "executable": "${workspaceFolder}/build/feather/zephyr/zephyr.elf",
+            "gdbPath": "/workspace/zephyr-sdk-1.0.1/gnu/arm-zephyr-eabi/bin/arm-zephyr-eabi-gdb",
+            "svdFile": "/workspace/modules/hal/nordic/nrfx/bsp/stable/mdk/nrf52840.svd"
         }
     ]
 }
