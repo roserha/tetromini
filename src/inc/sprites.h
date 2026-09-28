@@ -7,8 +7,8 @@
 // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
 ///////////////////////////////////////////////////////////
 
-#define SPRITE_NUM 104
-// Storage taken by sprites:                728B
+#define SPRITE_NUM 105
+// Storage taken by sprites:                735B
 
 ///////////////////////////////////////////////////////////
 // ^ THE CONTENTS ABOVE WERE PROGRAMATICALLY GENERATED ^ //

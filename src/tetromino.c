@@ -1,6 +1,5 @@
 #include "tetromino.h"
 #include "sprites.h"
-#include <stdio.h>
 
 // Determines the x and y positions of all four blocks of a tetromino
 // x:          x coordinate
@@ -8,17 +7,9 @@
 // block_type: which block to draw
 // spin_state: how the block is spinning
 // positions:  8-long array of coordinates
-void tetromino_get_positions(uint8_t x, uint8_t y, Tetromino block_type, Spin spin_state, uint8_t *positions)
+void tetromino_get_positions(uint_fast8_t x, uint_fast8_t y, Tetromino block_type, Spin spin_state, uint8_t *positions)
 {
     positions[0] = x; positions[1] = y;
-
-    if (block_type == OBlock)
-    {
-        positions[2] = x + 1; positions[3] = y;
-        positions[4] = x;     positions[5] = y - 1;
-        positions[6] = x + 1; positions[7] = y - 1;
-        return;
-    }
 
     // The following approach was developed as an attempt to speed up calculating
     // shifted vectors based on a rotation matrix! The math is really really
@@ -57,6 +48,18 @@ void tetromino_get_positions(uint8_t x, uint8_t y, Tetromino block_type, Spin sp
             positions[4] = x + dir_left_x;             positions[5] = y + dir_left_y;
             positions[6] = x + dir_right_x;            positions[7] = y + dir_right_y;
             break;
+            
+        case IBlock:
+            positions[2] = x + dir_left_x;                positions[3] = y + dir_left_y;
+            positions[4] = x + dir_right_x;               positions[5] = y + dir_right_y;
+            positions[6] = x + dir_right_x + dir_right_x; positions[7] = y + dir_right_y + dir_right_y;
+            break;
+            
+        case OBlock:
+            positions[2] = x + dir_up_x;               positions[3] = y + dir_up_y;
+            positions[4] = x + dir_right_x;            positions[5] = y + dir_right_y;
+            positions[6] = x + dir_up_x + dir_right_x; positions[7] = y + dir_up_y + dir_right_y;
+            break;
 
         case SBlock:
             positions[2] = x + dir_up_x;               positions[3] = y + dir_up_y;
@@ -77,47 +80,12 @@ void tetromino_get_positions(uint8_t x, uint8_t y, Tetromino block_type, Spin sp
             break;
 
         case LBlock:
+            default:
             positions[2] = x + dir_left_x;             positions[3] = y + dir_left_y;
             positions[4] = x + dir_right_x;            positions[5] = y + dir_right_y;
             positions[6] = x + dir_up_x + dir_right_x; positions[7] = y + dir_up_y + dir_right_y;
             break;
 
-        case IBlock:
-            // Special rotation case: pivot between block 2 and 3
-            switch (spin_state)
-            {
-                case ZeroDeg:
-                    positions[0] = x-1; positions[1] = y;
-                    positions[2] = x;   positions[3] = y;
-                    positions[4] = x+1; positions[5] = y;
-                    positions[6] = x+2; positions[7] = y;
-                    break;
-
-                case NinetyDeg:
-                    positions[0] = x;   positions[1] = y-1;
-                    positions[2] = x;   positions[3] = y;
-                    positions[4] = x;   positions[5] = y+1;
-                    positions[6] = x;   positions[7] = y+2;
-                    break;
-
-                case OneEightyDeg:
-                    positions[0] = x-1; positions[1] = y+1;
-                    positions[2] = x;   positions[3] = y+1;
-                    positions[4] = x+1; positions[5] = y+1;
-                    positions[6] = x+2; positions[7] = y+1;
-                    break;
-
-                case TwoSeventyDeg:
-                default:
-                    positions[0] = x+1; positions[1] = y-1;
-                    positions[2] = x+1; positions[3] = y;
-                    positions[4] = x+1; positions[5] = y+1;
-                    positions[6] = x+1; positions[7] = y+2;
-                    break;
-            }
-        
-        default:
-            break;
     }
 }
 
@@ -137,6 +105,31 @@ bool tetromino_draw(uint_fast8_t x, uint_fast8_t y, Tetromino block_type, Spin s
     OutOfBounds |= sprite_draw_block(Coordinates[2], Coordinates[3], block_type);
     OutOfBounds |= sprite_draw_block(Coordinates[4], Coordinates[5], block_type);
     OutOfBounds |= sprite_draw_block(Coordinates[6], Coordinates[7], block_type);
+
+    return OutOfBounds;
+}
+
+// Draws phantom tetrimino with the central block at (x,y) using tetrimino coordinate system
+// x:          x coordinate
+// y:          y coordinate
+// block_type: which block to draw
+// spin_state: how the block is spinning
+bool tetromino_draw_phantom(uint_fast8_t x, uint_fast8_t y, Tetromino block_type, Spin spin_state)
+{
+    bool OutOfBounds = false;
+    uint8_t Coordinates[8] = {0};
+
+    tetromino_get_positions(x, y, block_type, spin_state, Coordinates);
+
+    for (int i = 0; i < 8; i += 2)
+    {
+        uint_fast8_t x = Coordinates[i];
+        uint_fast8_t y = Coordinates[i+1];
+
+        if (x >= 10 || y >= 18 || block_type > 7) { OutOfBounds = true; continue; }
+
+        sprite_draw(104, y*6 + 2, x*6 + 2);
+    }
 
     return OutOfBounds;
 }

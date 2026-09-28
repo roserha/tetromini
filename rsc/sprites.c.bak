@@ -12,7 +12,7 @@
 // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
 ///////////////////////////////////////////////////////////
 
-const uint8_t sprite_array[728] = {
+const uint8_t sprite_array[735] = {
     6, 0b111111, 0b100001, 0b101101, 0b101101, 0b100001, 0b111111,
     6, 0b111111, 0b110101, 0b101011, 0b110101, 0b101011, 0b111111,
     6, 0b111111, 0b100001, 0b100001, 0b100001, 0b100001, 0b111111,
@@ -116,7 +116,8 @@ const uint8_t sprite_array[728] = {
     6, 0b110000, 0b111001, 0b011101, 0b001111, 0b000111, 0b011111,
     6, 0b000011, 0b100111, 0b101110, 0b111100, 0b111000, 0b111110,
     6, 0b111110, 0b111000, 0b111100, 0b101110, 0b100111, 0b000011,
-    6, 0b010000, 0b101010, 0b100101, 0b101010, 0b010000, 0b101000
+    6, 0b010000, 0b101010, 0b100101, 0b101010, 0b010000, 0b101000,
+    6, 0b101010, 0b000001, 0b100000, 0b000001, 0b100000, 0b010101
 };
 
 ///////////////////////////////////////////////////////////
@@ -158,14 +159,14 @@ uint8_t sprite_draw(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y)
 // block_type: which block to draw based on block enum ids
 bool sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
 {
-    if (x >= 10 || y >= 18) { return false; }
+    if (x >= 10 || y >= 18 || block_type > 7) { return false; }
 
     uint_fast8_t x_raw = y * 6 + 2;
     uint_fast8_t y_raw = x * 6 + 2;
 
-    if (block_type < 7)
+    if (block_type > 0)
     {
-        sprite_draw(block_type & 7, x_raw, y_raw);
+        sprite_draw(block_type - 1, x_raw, y_raw);
     } 
     else
     {

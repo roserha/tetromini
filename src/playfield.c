@@ -4,62 +4,72 @@
 
 // We will keep track of the active playfield by borrowing bitboards from chess!!
 
-// Given the playfield is 10x22, with only the first 18 rows visible, we need 220 bits for that. 
-// With seven pieces, alongside an ORred bitfield of filled spots, we have 220B of data to store for playfields. Not too shabby!!
-// Thing is, 220 doesn't divide evenly into 8, 16 or 32. But if we store 224B of data, we can represent the entire playfield using
-// uint32_ts, which can optimize processor cycles a smidge!
+// Given the playfield is 10x22, with only the first 18 rows visible, we need to store 220 blocks of data. 
+// (row 0 needs to exist because otherwise floor collisions have the chance to underflow and undefined things happen :p sue me but not really)
+// With 6 blocks, we can store a tile's blocktype, and naturally b000 means empty!
+// With 10 tiles per row, this means 30 bits per row! Each row can be represented by a 32-bit int, wasting only 2 bits per row!
+// As such, with 22 rows, our entire playfield takes up only 88 bytes!! RAH!!!!! EFFICIENCY!!!!!!!!!
 
-// Given each playfield is 220 bits long, the math for x,y,b to array is x + 10*y (+ 224*b)!
-
-// Each playfield is 7 bytes across from each other, so you can either pick (+ 224*b) or just add 7 * b later
-
-uint32_t Playfield [56] = {0};
+uint32_t Playfield [22] = {0};
 uint32_t Score = 0;
 uint_fast8_t Level = 1;
+uint32_t TotalLinesCleared = 0;
+uint32_t Combo = 0;
+uint32_t Timeout = 300;
 uint_fast8_t seen_pieces = 0;
 Tetromino nextPiece = TBlock;
 Tetromino currentPiece = TBlock;
 Spin currentSpinState = ZeroDeg;
 uint_fast8_t pieceXPos = 7;
 uint_fast8_t pieceYPos = 20;
+uint_fast8_t phantomYPos = 20;
 int64_t stopwatch = 0;
+
+// Piece offset data
+// This comes from the SRS page in the Tetris Wiki.
+// The way pieces are represented made it such that the naturally best approach to deal with rotations
+// and wall-kicks are by using offsets, since their rotations are naturally True Rotations, given their
+// root on vector and rotational matrix multiplication!
+
+// Sadly, we have to store them all explicitly to make computation easier...
+int8_t JLSTZ_Offsets[40] = {
+   0, 0,    0, 0,    0, 0,    0, 0,    0, 0,
+   0, 0,    1, 0,    1,-1,    0, 2,    1, 2,
+   0, 0,    0, 0,    0, 0,    0, 0,    0, 0,
+   0, 0,   -1, 0,   -1,-1,    0, 2,   -1, 2
+};
+
+int8_t I_Offsets[40] = {
+    0, 0,   -1, 0,    2, 0,   -1, 0,    2, 0,
+   -1, 0,    0, 0,    0, 0,    0, 1,    0,-2,
+   -1, 1,    1, 1,   -2, 1,    1, 0,   -2, 0,
+    0, 1,    0, 1,    0, 1,    0,-1,    0, 2
+};
+
+// These values are either false for -1 and true for 0 (bc i can just do O_Offset[i] + 1)
+// This is my way to at least save SOME space.
+bool O_Offsets[8] = {
+    true, true,
+    true,false,
+   false,false,
+   false, true
+};
+
+bool checkForLineClear = false;
+bool finishedCheck = false;
+uint_fast8_t indexesToShift[4] = {0};
 
 // Set state of block on bitfield based on tetrimino-coordinates
 // x:          x coordinate
 // y:          y coordinate
-// block_type: which block to set state of
-// state:      whether to turn block on or off
-void playfield_set_state(uint8_t x, uint8_t y, Tetromino block_type, bool state)
+// block_type: which block to set state of based on the enum. 0 means empty!
+void playfield_set_state(uint8_t x, uint8_t y, uint8_t block_type)
 {
-    if (x >= 10 || y >= 22) { return; }
+    if (x >= 10 || y >= 22 || block_type > 7) { return; }
 
-    uint32_t arrayCoord = (x + y*10);
-    uint32_t arrayRow = 1 << (arrayCoord & 31); // % 32
-    size_t arrayColumn = arrayCoord >> 5;       // / 32
-
-    uint32_t *columnToChange = &(Playfield[arrayColumn + block_type * 7]);
-
-    if (state) {
-        *columnToChange |= arrayRow;
-    } else {
-        *columnToChange &= ~arrayRow;
-    }
-}
-
-// Updates status of occupied playfield
-void playfield_update_occupied()
-{
-    for (size_t i = 0; i < 49; i+=7)
-    {
-        // Loop unrolling!
-        Playfield[49] |= Playfield[i  ];
-        Playfield[50] |= Playfield[i+1];
-        Playfield[51] |= Playfield[i+2];
-        Playfield[52] |= Playfield[i+3];
-        Playfield[53] |= Playfield[i+4];
-        Playfield[54] |= Playfield[i+5];
-        Playfield[55] |= Playfield[i+6];
-    }
+    uint32_t newValue = block_type << (x * 3);
+    uint32_t tileMask = ~(0b111 << (x * 3));
+    Playfield[y] = (Playfield[y] & tileMask) + newValue;
 }
 
 // Renders active playfield
@@ -68,35 +78,16 @@ void playfield_render()
     // Draw playfield bounds
     gfx_playfield();
 
-    // Draw individual playfields
-    for (size_t i = 0; i < 56; i+=7)
+    // Draw playfield itself
+    for (size_t i = 0; i < 18; i++) // Last few rows are out of view, so we don't need to go through all of them!
     {
-        uint_fast8_t blockStyle = i / 7;
-
-        // For cleanup, we only want to draw the OccupiedPlayfield (i.e. clear any unused gridspaces)
-        // if Occupied is 0.
-        int not_cleaning = (i < 49);
-
-        for (size_t j = 0; j < 7; j++) // Last few rows are out of view, so we don't need to go through all of them!
+        uint32_t PlayfieldRow = Playfield[i+1];
+        for (size_t j = 0; j < 10; j++) 
         {
-            uint32_t Column = Playfield[j + i];
-            for (uint_fast8_t k = 0; k < 32; k++)
-            {
-                uint_fast8_t coord = 32 * j + k;
-                uint_fast8_t x = coord % 10;
-                uint_fast8_t y = coord / 10; 
-                uint32_t k_bit = (1U << k);
-
-                if (y >= 18) // Only for four bits but we can avoid going inside other functions for this same if statement!
-                {
-                    break;
-                }
-
-                if ((Column & k_bit) == (k_bit * not_cleaning))
-                {
-                    sprite_draw_block(x, y, blockStyle);
-                }
-            }
+            uint32_t tileMask = (0b111 << (j * 3));
+            uint32_t tileData = (PlayfieldRow & tileMask) >> (j * 3);
+            uint_fast8_t blockStyle = tileData & 0b111;
+            sprite_draw_block(j, i, blockStyle);
         }
     }
 }
@@ -109,7 +100,7 @@ void playfield_print_header()
 	sprite_draw_text(113, 1, "Lvl:");
     sprite_draw_number(113, 18, Level, 10);
 	sprite_draw_text(113, 34, "Next:");
-    sprite_draw(71 + ((int)nextPiece), 113, 57);
+    sprite_draw(70 + ((int)nextPiece), 113, 57);
 }
 
 // Pull a random tetromino from the bag
@@ -139,7 +130,7 @@ Tetromino playfield_get_new_piece()
                 if ((rand & pieceCheckIndex) != 0)
                 {
                     foundPiece = true;
-                    piece = (Tetromino)i;
+                    piece = (Tetromino)(i+1);
                     seen_pieces |= pieceCheckIndex;
                     break;
                 }
@@ -150,18 +141,11 @@ Tetromino playfield_get_new_piece()
     return piece;
 }
 
-// Initializes playfield variables
-void playfield_init()
-{
-    // Initialize us at a random state of seen pieces
-    seen_pieces = sys_rand8_get() & 0b1111111;
-    
-    currentPiece = playfield_get_new_piece();
-    nextPiece = playfield_get_new_piece();
-    
-}
-
 // Check for collision of a hypothetical tetromino
+// block_type: Which block to check a collision for
+// spin_state: What spin state to check it in
+// x:          What x coordinate it is in
+// y:          What y coordinate it is in
 // Returns true if collision happens
 bool playfield_check_collision(Tetromino block_type, Spin spin_state, uint_fast8_t x, uint_fast8_t y)
 {
@@ -170,18 +154,18 @@ bool playfield_check_collision(Tetromino block_type, Spin spin_state, uint_fast8
     tetromino_get_positions(x, y, block_type, spin_state, Coordinates);
 
     // Simpler collision: colliding with walls (horizontally or bottom)
-    for (int i = 0; i < 7; i ++)
+    for (int i = 0; i < 8; i++)
     {
-        if ((i & 1) == 0) // Checking x
+        if ((i & 1) == 0) // Checking x (i is even)
         {
-            if (Coordinates[i] > 10)
+            if (Coordinates[i] >= 10)
             {
                 return true;
             }
         }
-        else // Checking y
+        else // Checking y (i is odd)
         {
-            if (Coordinates[i] > 25)
+            if (Coordinates[i] == 0)
             {
                 return true;
             }
@@ -191,21 +175,17 @@ bool playfield_check_collision(Tetromino block_type, Spin spin_state, uint_fast8
     // Harder collision: colliding with existing playfields
     // Transform x and y array into array coordinates
 
-    uint32_t block_array_coords [4] = { (Coordinates[0] + Coordinates[1]*10),
-                                        (Coordinates[2] + Coordinates[3]*10),
-                                        (Coordinates[4] + Coordinates[5]*10),
-                                        (Coordinates[6] + Coordinates[7]*10)};
-
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 8; i+=2)
     {
         // Check if coordinate we're looking at is set to occupied
 
-        uint32_t arrayRow = 1 << (block_array_coords[i] & 31); // % 32
-        size_t arrayColumn = block_array_coords[i] >> 5;       // / 32
+        size_t y = Coordinates[i+1];
+        uint8_t x = Coordinates[i];
 
-        uint32_t columnToCheck = Playfield[arrayColumn + 49];
+        uint32_t rowToCheck = Playfield[y];
+        uint32_t tileMask = (0b111 << (x * 3));
 
-        if ((columnToCheck & arrayRow) != 0)
+        if ((rowToCheck & tileMask) != 0)
         {
             return true;
         }
@@ -215,47 +195,305 @@ bool playfield_check_collision(Tetromino block_type, Spin spin_state, uint_fast8
     return false;
 }
 
+// Rotate tetromino left or right
+// right: true to rotate right, false to rotate left
+void playfield_rotate_current_piece(bool right)
+{
+    Spin desiredSpinState = currentSpinState;
+
+    switch (currentSpinState)
+    {
+        case ZeroDeg:
+            desiredSpinState = right ? TwoSeventyDeg : NinetyDeg;
+            break;
+
+        case TwoSeventyDeg:
+            desiredSpinState = right ? OneEightyDeg : ZeroDeg;
+            break;
+
+        case OneEightyDeg:
+            desiredSpinState = right ? NinetyDeg : TwoSeventyDeg;
+            break;
+
+        default:
+        case NinetyDeg:
+            desiredSpinState = right ? ZeroDeg : OneEightyDeg;
+            break;
+    }
+
+    // Wall kick detection logic
+    if (currentPiece == OBlock)
+    {
+        int_fast8_t targXKick = O_Offsets[desiredSpinState*2 + 0] + 1; int_fast8_t targYKick = O_Offsets[desiredSpinState*2 + 1] + 1;
+        int_fast8_t prevXKick = O_Offsets[currentSpinState*2 + 0] + 1; int_fast8_t prevYKick = O_Offsets[currentSpinState*2 + 1] + 1;
+
+        pieceXPos += prevXKick - targXKick;
+        pieceYPos += prevYKick - targYKick;
+        currentSpinState = desiredSpinState;
+        playfield_update_phantom();
+    }
+    else
+    {
+        int8_t* referenceTable = currentPiece == IBlock ? I_Offsets : JLSTZ_Offsets;
+        
+        for (int i = 0; i < 10; i+=2)
+        {
+            int_fast8_t prevXKick = referenceTable[currentSpinState*10 + i]; int_fast8_t prevYKick = referenceTable[currentSpinState*10 + i + 1];
+            int_fast8_t targXKick = referenceTable[desiredSpinState*10 + i]; int_fast8_t targYKick = referenceTable[desiredSpinState*10 + i + 1];
+
+            bool willItCollide = playfield_check_collision(currentPiece, desiredSpinState, pieceXPos + (prevXKick - targXKick), pieceYPos + (prevYKick - targYKick));
+            if (!willItCollide)
+            {
+                pieceXPos += prevXKick - targXKick;
+                pieceYPos += prevYKick - targYKick;
+                currentSpinState = desiredSpinState;
+                playfield_update_phantom();
+                break;
+            }
+        }
+    }
+}
+
+// Move tetromino right or left
+// right: true to rotate right, false to rotate left
+void playfield_move_current_piece(bool right)
+{
+    bool willItCollide = playfield_check_collision(currentPiece, currentSpinState, pieceXPos + (right ? 1 : -1), pieceYPos);
+    if (!willItCollide)
+    {
+        pieceXPos += right ? 1 : -1;
+        playfield_update_phantom();
+    }
+}
+
+// Logic to handle transferring pieces from currentPiece to playfield
+void playfield_finish_drop()
+{
+    // Set playfield to have new blocks
+    uint8_t Coordinates[8] = {0};
+
+    // Retrieve current tetromino block positions
+    tetromino_get_positions(pieceXPos, pieceYPos, currentPiece, currentSpinState, Coordinates);
+
+    // Set these blocks to be active in their respective color
+    for (int i = 0; i < 8; i+=2)
+    {
+        playfield_set_state(Coordinates[i], Coordinates[i+1], currentPiece);
+    }
+
+    currentPiece = nextPiece;
+    currentSpinState = ZeroDeg;
+    pieceYPos = 20;
+    if (currentPiece == OBlock)
+    {
+        pieceXPos = 5;
+    }
+    else
+    {
+        pieceXPos = 4;
+    }
+    nextPiece = playfield_get_new_piece();
+
+    checkForLineClear = true;
+
+    playfield_update_phantom();
+}
+
+// Soft drop piece
+void playfield_soft_drop()
+{
+    bool willItCollide = playfield_check_collision(currentPiece, currentSpinState, pieceXPos, pieceYPos - 1);
+        
+    if (!willItCollide)
+    {
+        pieceYPos--;
+    }
+    else
+    {
+        playfield_finish_drop();
+    }
+}
+
+// Hard drop piece to phantom position
+void playfield_hard_drop()
+{
+    pieceYPos = phantomYPos;
+    playfield_finish_drop();
+}
+
+
+
+// Update phantom tetromino Y Pos
+void playfield_update_phantom()
+{
+    for (int y = pieceYPos; y > 0; y--)
+    {
+        bool willItCollide = playfield_check_collision(currentPiece, currentSpinState, pieceXPos, y - 1);
+        
+        if (willItCollide)
+        {
+            phantomYPos = y;
+            break;
+        }
+    }
+}
+
+// Initializes playfield variables
+void playfield_init()
+{
+    // Initialize us at a random state of seen pieces
+    seen_pieces = sys_rand8_get() & 0b1111111;
+    
+    currentPiece = playfield_get_new_piece();
+    nextPiece = playfield_get_new_piece();
+    playfield_update_phantom();
+}
+
 // Update current playfield status
-void playfield_tick(int64_t delta_time, int64_t elapsed_time)
+// delta_time: how much time passed since last frame
+// elapsed_time: how much time passed since boot
+void playfield_tick(int64_t delta_time, int64_t elapsed_time, bool *user_data)
 {
     if (elapsed_time == 0)
     {
         return;
     }
 
-    Score = elapsed_time;
-    Level = delta_time;
-
-    if (elapsed_time - stopwatch > 300)
+    if (!user_data[0])
     {
-        bool willItCollide = playfield_check_collision(currentPiece, currentSpinState, pieceXPos, pieceYPos - 1);
-        
-        if (!willItCollide)
+        if (elapsed_time - stopwatch > Timeout && !checkForLineClear)
         {
-            pieceYPos--;
+            playfield_soft_drop();
             stopwatch = elapsed_time;
         }
-
-        else
+    }
+    else
+    {
+        uint32_t interval = (pieceYPos != phantomYPos) ? (Timeout >> 2) : Timeout;
+        if (elapsed_time - stopwatch > interval && !checkForLineClear)
         {
-            // Set playfield to have new blocks
-            uint8_t Coordinates[8] = {0};
-    
-            tetromino_get_positions(pieceXPos, pieceYPos, currentPiece, currentSpinState, Coordinates);
-
-            for (int i = 0; i < 8; i+=2)
-            {
-                playfield_set_state(Coordinates[i], Coordinates[i+1], currentPiece, true);
-            }
-
-            playfield_update_occupied();
-
-            pieceXPos = 7;
-            pieceYPos = 20;
-            currentPiece = nextPiece;
-            nextPiece = playfield_get_new_piece();
+            playfield_soft_drop();
+            stopwatch = elapsed_time;
         }
     }
 
-    tetromino_draw(pieceXPos, pieceYPos, currentPiece, currentSpinState);
+    tetromino_draw_phantom(pieceXPos, phantomYPos - 1, currentPiece, currentSpinState);
+    tetromino_draw(pieceXPos, pieceYPos - 1, currentPiece, currentSpinState);
+
+    if (checkForLineClear && !finishedCheck)
+    {
+        // clear indexes to shift
+        memset(indexesToShift, 0, sizeof(indexesToShift));
+        uint_fast8_t linesCleared = 0;
+
+        for (int i = 0; i < 22; i++)
+        {
+            bool wholeLineOccupied = true;
+            uint32_t PlayfieldRow = Playfield[i];
+
+            for (int j = 0; j < 10; j++)
+            {
+                uint32_t tileMask = (0b111 << (j * 3));
+                
+                wholeLineOccupied &= ((PlayfieldRow & tileMask) != 0);
+                
+                if (!wholeLineOccupied)
+                {
+                    // Let's skip to next line
+                    break;
+                }
+
+                if (wholeLineOccupied && j == 9)
+                {
+                    // WE HAVE A LINE CLEAR!
+                    indexesToShift[linesCleared] = i - linesCleared; // <- we have to remember that the line in question will be 1 row down when prev line is cleared
+                    linesCleared += 1;
+                    stopwatch = elapsed_time;
+                }
+            }
+        }
+
+        checkForLineClear = (linesCleared != 0);
+
+        if (checkForLineClear)
+        {
+            switch (linesCleared)
+            {
+                case 1:
+                    Score += 100 * Level;
+                    break;
+                case 2:
+                    Score += 400 * Level;
+                    break;
+                case 3:
+                    Score += 900 * Level;
+                    break;
+                case 4:
+                    Score += 1600 * Level;
+                    break;
+                default:
+                    break;
+            }
+
+            Score += 50 * Combo * Level;
+
+            TotalLinesCleared += linesCleared * linesCleared;
+
+            while (TotalLinesCleared > Level * 10)
+            {
+                TotalLinesCleared -= Level * 10;
+                Level++;
+                if (Level <= 8)
+                {
+                    Timeout -= 83;
+                }
+                else if (Level == 9)
+                {
+                    Timeout -= 33;
+                }
+                else if (Level == 10)
+                {
+                    Timeout -= 17;
+                }
+                else if (Level <= 19)
+                {
+                    Timeout -= 5;
+                }
+                else if (Level <= 28)
+                {
+                    Timeout -= 2;
+                }
+            }
+
+            Combo++;
+        }
+        finishedCheck = true;
+    }
+    else if (checkForLineClear && finishedCheck)
+    {
+        // Translate occupied lines one row down using memmove!
+        // We are only at most clearing 4 lines at a time, so the translation array will only
+        // have to look at a depth of 4. Unused spaces are labeled as 0, so when we find a 0,
+        // we stop.
+
+        for (int i = 0; i < 4; i++)
+        {
+            uint_fast8_t index = indexesToShift[i];
+            if (index == 0)
+            {
+                break;
+            }
+            
+            // Overlap-safe version of memcpy!
+            memmove(&Playfield[index], &Playfield[index+1], sizeof(uint32_t)*(21-index));
+            Playfield[21] = 0;
+        }
+
+        checkForLineClear = false;
+        finishedCheck = false;
+    }
+    else if (!checkForLineClear && finishedCheck)
+    {
+        finishedCheck = false;
+    }
 }
