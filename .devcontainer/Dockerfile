@@ -7,6 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates wget && \
         rm -rf /var/lib/apt/lists/*
 
+# segger j-link software pack (gdb server, JLinkExe, rtt tools)
+RUN wget -q --post-data "accept_license_agreement=accepted&non_emb_ctr=confirmed&submit=Download+software" \
+        -O /tmp/jlink.deb https://www.segger.com/downloads/jlink/JLink_Linux_x86_64.deb && \
+    apt-get update && \
+    dpkg --unpack /tmp/jlink.deb && \
+    rm -f /var/lib/dpkg/info/jlink.postinst && \
+    apt-get install -yf --no-install-recommends && \
+    rm -rf /tmp/jlink.deb /var/lib/apt/lists/*
+
 # download cmake
 RUN wget -qO- "https://github.com/Kitware/CMake/releases/download/v3.31.12/cmake-3.31.12-linux-x86_64.tar.gz" \
         | tar --strip-components=1 -xz -C /usr/local/
@@ -35,7 +44,7 @@ RUN \
           curl libtinfo6 unzip zip \
           ninja-build gperf device-tree-compiler \
           python3-dev python3-venv xz-utils file make \
-          gcc gcc-multilib libsdl2-dev libmagic1 && \
+          gcc gcc-multilib libsdl2-dev libmagic1 gdb && \
         rm -rf /var/lib/apt/lists/* && \
         echo "dash dash/sh boolean false" | debconf-set-selections && \
         dpkg-reconfigure dash
@@ -60,7 +69,7 @@ RUN chmod +x /usr/local/bin/bootstrap-workspace
 
 USER zephyr
 WORKDIR /home/zephyr
-RUN git config --global user.email "zephyr@example.com" && git config --global user.name "Zephyr Docker Container"
+RUN git config --global user.email "rorha04@gmail.com" && git config --global user.name "Rose Rodrigues"
 
 # activate venv!
 RUN printf '%s\n' \

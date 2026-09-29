@@ -1,6 +1,50 @@
 /* Initial device tree overlay for Linux Native_Sim */
 
 #include <zephyr/dt-bindings/display/panel.h> /* Required for SDL window simulating */
+#include <zephyr/dt-bindings/input/input-event-codes.h> /* For input keys */
+
+&gpio0 {
+    ngpios = <6>;
+
+    sdl_gpio {
+        compatible = "zephyr,gpio-emul-sdl";
+        /*
+        O for left turn, P for right turn
+        WASD for up down left right
+        */
+        scancodes = <18 19 7 4 22 26>;
+    }; 
+};
+
+/ {
+    keypad: keypad {
+        compatible = "gpio-keys";
+        rot_left {
+                gpios = <&gpio0 0 GPIO_ACTIVE_HIGH >; /* D12 */
+                zephyr,code = <INPUT_BTN_X>;
+        };
+        rot_right {
+                gpios = <&gpio0 1 GPIO_ACTIVE_HIGH >; /* D11 */
+                zephyr,code = <INPUT_BTN_Y>;
+        };
+        move_right {
+                gpios = <&gpio0 2 GPIO_ACTIVE_HIGH >; /* A3 */
+                zephyr,code = <INPUT_BTN_DPAD_RIGHT>;
+        };
+        move_left {
+                gpios = <&gpio0 3 GPIO_ACTIVE_HIGH >; /* A2 */
+                zephyr,code = <INPUT_BTN_DPAD_LEFT>;
+        };
+        move_down {
+                gpios = <&gpio0 4 GPIO_ACTIVE_HIGH >; /* A1 */
+                zephyr,code = <INPUT_BTN_DPAD_DOWN>;
+        };
+        move_up {
+                gpios = <&gpio0 5 GPIO_ACTIVE_HIGH >; /* A0 */
+                zephyr,code = <INPUT_BTN_DPAD_UP>;
+        };
+    };
+};
 
 &sdl_dc{
     width = <128>;

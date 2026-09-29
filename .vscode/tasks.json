@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Native Sim",
+            "type": "shell",
+            "command": "west build -p -b native_sim /workspace/applications/tetrimini -- -DCONFIG_DEBUG_OPTIMIZATIONS=y",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+
+        {
+            "label": "Build UF2",
+            "type": "shell",
+            "command": "west build -b adafruit_feather_nrf52840/nrf52840/uf2 -p -S cdc-acm-console /workspace/applications/tetrimini",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+            }
+        },
+
+        {
+            "label": "Build Feather",
+            "type": "shell",
+            "command": "west build -b adafruit_feather_nrf52840/nrf52840 -d build/feather /workspace/applications/tetrimini -- -DCONFIG_DEBUG_OPTIMIZATIONS=y -DCONFIG_DEBUG_THREAD_INFO=y",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+
+        {
+            "label": "Flash Feather",
+            "type": "shell",
+            "command": "west flash -d build/feather -r jlink",
+            "dependsOn": "Build Feather",
+            "problemMatcher": []
+        }
+    ]
+}
