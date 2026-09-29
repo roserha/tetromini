@@ -2397,6 +2397,39 @@
 				)
 			)
 		)
+		(property "DigiKey_PN" "679-2442-ND"
+			(at 153.67 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MJTP1234"
+			(at 153.67 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "  APEM Inc."
+			(at 153.67 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "68a03fc6-a8a7-439a-b53f-994b226a707c")
 		)
@@ -2467,6 +2500,39 @@
 			)
 		)
 		(property "Description" "Push button switch, generic, two pins"
+			(at 153.67 120.65 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "DigiKey_PN" "679-2442-ND"
+			(at 153.67 120.65 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MJTP1234"
+			(at 153.67 120.65 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "  APEM Inc."
 			(at 153.67 120.65 0)
 			(hide yes)
 			(show_name no)
@@ -2713,6 +2779,39 @@
 				)
 			)
 		)
+		(property "DigiKey_PN" "679-2442-ND"
+			(at 190.5 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MJTP1234"
+			(at 190.5 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "  APEM Inc."
+			(at 190.5 81.28 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "f48faf33-adf8-4658-b1d2-4bdb3c2e6fc6")
 		)
@@ -2939,6 +3038,39 @@
 			)
 		)
 		(property "Description" "Push button switch, generic, two pins"
+			(at 153.67 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "DigiKey_PN" "679-2442-ND"
+			(at 153.67 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MJTP1234"
+			(at 153.67 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "  APEM Inc."
 			(at 153.67 93.98 0)
 			(hide yes)
 			(show_name no)
@@ -3332,7 +3464,40 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Generic 2.42in SSD1309 OLED SPI Display"
+			(at 193.04 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "DigiKey_PN" "--"
+			(at 193.04 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "--"
+			(at 193.04 104.14 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "HiLetgo"
 			(at 193.04 104.14 0)
 			(hide yes)
 			(show_name no)
@@ -3438,6 +3603,39 @@
 				)
 			)
 		)
+		(property "DigiKey_PN" "679-2442-ND"
+			(at 153.67 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MJTP1234"
+			(at 153.67 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "  APEM Inc."
+			(at 153.67 106.68 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
 		(pin "2"
 			(uuid "9be4fc65-2631-4c72-8f7e-fd5867022bcf")
 		)
@@ -3465,7 +3663,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "eb5e9243-f8f8-4f80-9f26-dde45bebe434")
-		(property "Reference" "U2"
+		(property "Reference" "U1"
 			(at 104.14 99.06 90)
 			(hide yes)
 			(show_name no)
@@ -3508,8 +3706,41 @@
 				)
 			)
 		)
-		(property "Description" ""
+		(property "Description" "Feather nRF52840 Express"
 			(at 104.14 99.06 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "DigiKey_PN" "1528-2828-ND"
+			(at 104.14 99.06 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "4062"
+			(at 104.14 99.06 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "Adafruit"
+			(at 104.14 99.06 90)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -3606,7 +3837,7 @@
 		(instances
 			(project "Tetromini"
 				(path "/2d640f78-baf6-4866-abfa-b8b1a428b5a4"
-					(reference "U2")
+					(reference "U1")
 					(unit 1)
 				)
 			)
@@ -3667,6 +3898,39 @@
 			)
 		)
 		(property "Description" "Push button switch, generic, two pins"
+			(at 190.5 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "DigiKey_PN" "679-2442-ND"
+			(at 190.5 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "MPN" "MJTP1234"
+			(at 190.5 93.98 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Manufacturer" "  APEM Inc."
 			(at 190.5 93.98 0)
 			(hide yes)
 			(show_name no)
