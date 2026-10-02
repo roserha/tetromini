@@ -15,7 +15,7 @@ uint32_t Score = 0;
 uint_fast8_t Level = 1;
 uint32_t TotalLinesCleared = 0;
 uint32_t Combo = 0;
-uint32_t Timeout = 300;
+uint32_t Timeout = 717;
 uint_fast8_t seen_pieces = 0;
 Tetromino nextPiece = TBlock;
 Tetromino currentPiece = TBlock;
@@ -90,6 +90,12 @@ void playfield_render()
             sprite_draw_block(j, i, blockStyle);
         }
     }
+
+    // Draw phatom tetromino
+    tetromino_draw_phantom(pieceXPos, phantomYPos - 1, currentPiece, currentSpinState);
+
+    // Draw current tetromino
+    tetromino_draw(pieceXPos, pieceYPos - 1, currentPiece, currentSpinState);
 }
 
 // Renders current info (score, level, next piece)
@@ -341,9 +347,19 @@ void playfield_init()
 {
     // Initialize us at a random state of seen pieces
     seen_pieces = sys_rand8_get() & 0b1111111;
+
+    // Empty out playing field
+    memset(Playfield, 0, 22*sizeof(uint32_t));
     
     currentPiece = playfield_get_new_piece();
     nextPiece = playfield_get_new_piece();
+    pieceXPos = 4;
+    pieceYPos = 20;
+    Score = 0;
+    Level = 1;
+    TotalLinesCleared = 0;
+    Combo = 0;
+    Timeout = 717;
     playfield_update_phantom();
 }
 
@@ -374,9 +390,6 @@ void playfield_tick(int64_t delta_time, int64_t elapsed_time, bool *user_data)
             stopwatch = elapsed_time;
         }
     }
-
-    tetromino_draw_phantom(pieceXPos, phantomYPos - 1, currentPiece, currentSpinState);
-    tetromino_draw(pieceXPos, pieceYPos - 1, currentPiece, currentSpinState);
 
     if (checkForLineClear && !finishedCheck)
     {

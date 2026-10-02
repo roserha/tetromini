@@ -19,6 +19,9 @@
 // Initializes graphics information and frame buffer using transposed coordinate system
 int  gfx_init(void);
 
+// Shuts down display
+void gfx_shutdown(void);
+
 // Clears the buffer
 void gfx_clear(void);
 

@@ -23,7 +23,16 @@ int  gfx_init(void)
     }
 
     gfx_clear();
+    gfx_flush();
+    display_blanking_off(disp);
     return 0;
+}
+
+void gfx_shutdown(void)
+{
+    gfx_clear();
+    gfx_flush();
+    display_blanking_on(disp);
 }
 
 // Clears the buffer by filling it with 0s
@@ -116,8 +125,6 @@ void gfx_fill(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bo
 int  gfx_flush(void)
 {
     display_write(disp, 0, 0, &desc, fb);
-    display_blanking_off(disp);
-
     return 0;
 }
 

@@ -14,18 +14,6 @@
         },
 
         {
-            "label": "Build UF2",
-            "type": "shell",
-            "command": "west build -b adafruit_feather_nrf52840/nrf52840/uf2 -p -S cdc-acm-console /workspace/applications/tetrimini",
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-            }
-        },
-
-        {
             "label": "Build Feather",
             "type": "shell",
             "command": "west build -b adafruit_feather_nrf52840/nrf52840 -d build/feather /workspace/applications/tetrimini -- -DCONFIG_DEBUG_OPTIMIZATIONS=y -DCONFIG_DEBUG_THREAD_INFO=y",

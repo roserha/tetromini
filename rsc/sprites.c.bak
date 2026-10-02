@@ -12,7 +12,7 @@
 // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
 ///////////////////////////////////////////////////////////
 
-const uint8_t sprite_array[735] = {
+const uint8_t sprite_array[749] = {
     6, 0b111111, 0b100001, 0b101101, 0b101101, 0b100001, 0b111111,
     6, 0b111111, 0b110101, 0b101011, 0b110101, 0b101011, 0b111111,
     6, 0b111111, 0b100001, 0b100001, 0b100001, 0b100001, 0b111111,
@@ -117,7 +117,9 @@ const uint8_t sprite_array[735] = {
     6, 0b000011, 0b100111, 0b101110, 0b111100, 0b111000, 0b111110,
     6, 0b111110, 0b111000, 0b111100, 0b101110, 0b100111, 0b000011,
     6, 0b010000, 0b101010, 0b100101, 0b101010, 0b010000, 0b101000,
-    6, 0b101010, 0b000001, 0b100000, 0b000001, 0b100000, 0b010101
+    6, 0b101010, 0b000001, 0b100000, 0b000001, 0b100000, 0b010101,
+    2, 0b011110, 0b100001, 0b000000, 0b000000, 0b000000, 0b000000,
+    2, 0b100001, 0b011110, 0b000000, 0b000000, 0b000000, 0b000000
 };
 
 ///////////////////////////////////////////////////////////
@@ -180,7 +182,8 @@ bool sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
 // x:        x coordinate
 // y:        y coordinate
 // sentence: *null-terminated* string
-void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
+// Returns new y position after finishing writing
+uint_fast8_t sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
 {
     uint_fast8_t index = 0;
     uint_fast8_t caret_distance = 0;
@@ -259,6 +262,14 @@ void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
                 case '&':
                     sprite_code = 103;
                     break;
+
+                case '(':
+                    sprite_code = 105;
+                    break;
+
+                case ')':
+                    sprite_code = 106;
+                    break;
                     
                 case '?':
                 default:
@@ -271,9 +282,12 @@ void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence)
             
         index++;
     }
+
+    return y + caret_distance;
 }
 
-void sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base)
+// Returns new y position after finishing writing
+uint_fast8_t sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base)
 {
     int32_t remainder = number;
     uint_fast8_t caret_distance = 0;
@@ -283,7 +297,7 @@ void sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fas
 
     if (base > 62)
     {
-        return;
+        return 0;
     }
 
     if (remainder < 0)
@@ -307,4 +321,6 @@ void sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fas
     {
         caret_distance += 1 + sprite_draw(char_ids[i], x, y + caret_distance);
     }
+
+    return y + caret_distance;
 }

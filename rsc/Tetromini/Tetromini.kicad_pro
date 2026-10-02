@@ -475,7 +475,7 @@
         "uuid": "2d640f78-baf6-4866-abfa-b8b1a428b5a4"
       }
     ],
-    "used_designators": "ROT_RIGHT1,ROT_LEFT1,RIGHT1,LEFT1,DOWN1,#PWR1-10,DS1,SW1,UP1-5,U1-2",
+    "used_designators": "START2,ROT_RIGHT1,ROT_LEFT1,RIGHT1,LEFT1,DOWN1,#PWR1-12,DS1,SW1,UP1-5,U1-2",
     "variants": []
   },
   "sheets": [

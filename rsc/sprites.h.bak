@@ -7,8 +7,8 @@
 // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
 ///////////////////////////////////////////////////////////
 
-#define SPRITE_NUM 105
-// Storage taken by sprites:                735B
+#define SPRITE_NUM 107
+// Storage taken by sprites:                749B
 
 ///////////////////////////////////////////////////////////
 // ^ THE CONTENTS ABOVE WERE PROGRAMATICALLY GENERATED ^ //
@@ -41,13 +41,15 @@ bool sprite_draw_block(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type);
 // x:        x coordinate
 // y:        y coordinate
 // sentence: *null-terminated* string
-void sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence);
+// Returns new y position after finishing writing
+uint_fast8_t sprite_draw_text(uint_fast8_t x, uint_fast8_t y, char *sentence);
 
 // Writes number using sprites at specified coordinate using transposed coordinate system
 // x:        x coordinate
 // y:        y coordinate
 // number:   number to print
 // base:     base to print the number at
-void sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base);
+// Returns new y position after finishing writing
+uint_fast8_t sprite_draw_number(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base);
 
 #endif
