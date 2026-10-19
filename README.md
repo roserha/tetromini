@@ -1,4 +1,4 @@
-# Tetromini - Nordic Edition (DEPRECATED)
+# Tetromini - Nordic Edition (DEPRECATED VERSION)
 ## WARNING
 
 This version of the project has since been deprecated in favor of working within freeRTOS inside an STM32F405. For up-to-date developments, see the `dev_stm` branch. Thank you!! :)
