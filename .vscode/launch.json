@@ -1,0 +1,18 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Tetromino (J-Link)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "servertype": "jlink",
+      "cwd": "${workspaceFolder}",
+      "executable": "${workspaceFolder}/Tetromini/build/Debug/Tetromini.elf",
+      "device": "STM32F405RG",
+      "interface": "swd",
+      "runToEntryPoint": "main",
+      "rtos": "FreeRTOS",
+      "gdbPath": "gdb"
+    }
+  ]
+}

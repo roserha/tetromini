@@ -1,0 +1,9 @@
+# build output (CMake)
+build/
+
+# KiCad junk
+.history/
+*-backups/
+fp-info-cache
+*.lck
+_autosave-*
