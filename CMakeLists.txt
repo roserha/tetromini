@@ -11,6 +11,9 @@ cmake_minimum_required(VERSION 3.28.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(tetrimini)
 
+set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
+generate_inc_file_for_target(app rsc/bapple.bin ${gen_dir}/bapple.bin.inc)
+
 target_include_directories(app PRIVATE src/inc)
 
 target_sources(app PRIVATE
@@ -19,6 +22,7 @@ target_sources(app PRIVATE
   src/playfield.c
   src/sprites.c
   src/tetromino.c
+  src/mediaplayer.c
 )
 
 add_dependencies(app run_python_script)

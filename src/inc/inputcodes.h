@@ -1,3 +1,6 @@
+#ifndef INPUTCODES
+#define INPUTCODES
+
 // This defines input codes to make things a bit faster to understand code-wise
 enum InputType {
     TTO_ROT_LEFT_PRESS = 0b10000000,
@@ -17,3 +20,5 @@ enum InputType {
     TTO_START_RELEASE = 0b10001101,
     TTO_POWER_RELEASE = 0b10001111 
 };
+
+#endif
