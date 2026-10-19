@@ -1,4 +1,8 @@
-# Tetromini (In Active Development)
+# Tetromini - Nordic Edition (DEPRECATED)
+## WARNING
+
+This version of the project has since been deprecated in favor of working within freeRTOS inside an STM32F405. For up-to-date developments, see the `dev_stm` branch. Thank you!! :)
+
 ## About
 Tetromini is a portable console based on an Adafruit Feather nRF52840 Express running a custom-made Zephyr-based firmware that plays a fan-made version of a falling-block puzzle game!
 
