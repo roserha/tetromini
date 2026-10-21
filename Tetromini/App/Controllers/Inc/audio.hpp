@@ -1,6 +1,7 @@
 #pragma once
-#include <array>
-#include <cstdint>
+#include <array>     // for arrays
+#include <cstdint>   // for stdints
+#include <algorithm> // for filling sections of array during updates
 
 typedef struct {
     float phase;

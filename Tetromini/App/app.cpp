@@ -254,6 +254,7 @@ namespace {
     StaticTask_t          audioTcb;                                // FreeRTOS task control block for the task
     constexpr UBaseType_t kAudioPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
     QueueHandle_t         xAudioQueue = NULL;                      // Notes queue to avoid race conditions
+    TaskHandle_t          xAudioTaskHandle = NULL;                 // Task handle for notifications
 
 
 
@@ -283,20 +284,26 @@ namespace {
 
         Command_t xReceivedCommand;
 
+        uint32_t ulInterruptStatus = 0;
+        uint32_t missedDeadlines = 0;
+
         for (;;)
         {
-            // Wait for audio commands
-            if (xQueueReceive(xAudioQueue, &xReceivedCommand, portMAX_DELAY) == pdTRUE)
+            xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
+
+            if ((ulInterruptStatus & 0x1) == 0x1) /* Dma error */
+                {}
+            if ((ulInterruptStatus & 0x2) == 0x2) /* Half Complete */
+                audioController.processAudioCallback(false);
+            if ((ulInterruptStatus & 0x4) == 0x4) /* Fully complete */
+                audioController.processAudioCallback(true);
+            if ((ulInterruptStatus & 0x6) == 0x6) /* Both half and full, we missed a deadline */
+                missedDeadlines++;
+
+            // Process any incoming notes
+            while (xQueueReceive(xAudioQueue, &xReceivedCommand, 0) == pdTRUE)
             {
-                if (xReceivedCommand.cmdType != CMD_AUDIO_PLAY_SOUND)
-                {
-                    switch (xReceivedCommand.cmdType)
-                    {
-                        case CMD_AUDIO_DMA_HALF_COMPLETE: /* half complete */ audioController.processAudioCallback(false);  break;
-                        case CMD_AUDIO_DMA_COMPLETE: /* complete */           audioController.processAudioCallback(true);   break;
-                        default: break;
-                    }
-                } else
+                if (xReceivedCommand.cmdType == CMD_AUDIO_PLAY_SOUND)
                 {
                     uint32_t noteInfo = xReceivedCommand.cmdInfo;
                     uint16_t note = 0x1F & noteInfo;
@@ -321,25 +328,23 @@ namespace {
 
     extern "C" void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
     {
-        if (hi2s == &hi2s2 && xAudioQueue != NULL)
+        if (hi2s == &hi2s2 && xAudioTaskHandle != NULL)
         {
             audioDmaFailed = true;
 
-            Command_t cmd = { CMD_AUDIO_DMA_ERROR, 0, nullptr };
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xQueueSendToFrontFromISR(xAudioQueue, (void*)&cmd, &higherPriorityTaskWoken);
             //configASSERT( == pdPASS);
+            xTaskNotifyFromISR(xAudioTaskHandle, 0x1, eSetBits, &higherPriorityTaskWoken);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
     }
 
     extern "C" void HAL_I2S_TxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
     {
-        if (hi2s == &hi2s2 && xAudioQueue != NULL)
+        if (hi2s == &hi2s2 && xAudioTaskHandle != NULL)
         {
-            Command_t cmd = { CMD_AUDIO_DMA_HALF_COMPLETE, 0, nullptr };
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xQueueSendToFrontFromISR(xAudioQueue, (void*)&cmd, &higherPriorityTaskWoken);
+            xTaskNotifyFromISR(xAudioTaskHandle, 0x2, eSetBits, &higherPriorityTaskWoken);
             //configASSERT( == pdPASS);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
@@ -347,11 +352,10 @@ namespace {
 
     extern "C" void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s)
     {
-        if (hi2s == &hi2s2 && xAudioQueue != NULL)
+        if (hi2s == &hi2s2 && xAudioTaskHandle != NULL)
         {
-            Command_t cmd = { CMD_AUDIO_DMA_HALF_COMPLETE, 0, nullptr };
             BaseType_t higherPriorityTaskWoken = pdFALSE;
-            xQueueSendToFrontFromISR(xAudioQueue, (void*)&cmd, &higherPriorityTaskWoken);
+            xTaskNotifyFromISR(xAudioTaskHandle, 0x4, eSetBits, &higherPriorityTaskWoken);
             //configASSERT( == pdPASS);
             portYIELD_FROM_ISR(higherPriorityTaskWoken);
         }
@@ -370,44 +374,202 @@ namespace {
     {
         Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, 0, nullptr};
 
-        for(;;)
+        // temporary OBVIOUSLY
+ for(;;)
         {
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 4, 5, 10, 512);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 4, 5, 64, 384);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(512));
+            vTaskDelay(pdMS_TO_TICKS(384));
 
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 11, 4, 10, 256);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 11, 4, 64, 192);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(256));
+            vTaskDelay(pdMS_TO_TICKS(192));
 
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 0, 5, 10, 256);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(256));
+            vTaskDelay(pdMS_TO_TICKS(192));
 
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 1, 5, 10, 512);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 2, 5, 64, 384);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(512));
+            vTaskDelay(pdMS_TO_TICKS(384));
 
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 0, 5, 10, 256);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(256));
+            vTaskDelay(pdMS_TO_TICKS(192));
 
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 11, 4, 10, 256);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 11, 4, 64, 192);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(256));
+            vTaskDelay(pdMS_TO_TICKS(192));
 
-            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 9, 4, 10, 512);
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 4, 64, 384);
             xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
 
-            vTaskDelay(pdMS_TO_TICKS(512));
+            vTaskDelay(pdMS_TO_TICKS(384));
 
-            vTaskDelay(pdMS_TO_TICKS(4096));
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 4, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 4, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 2, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 11, 4, 64, 576);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(576));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 2, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 4, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 4, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 4, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            // 1/4 rest
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            // 8th rest
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 2, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 5, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 7, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 5, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 4, 5, 64, 576);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(576));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 4, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 2, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 11, 4, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 11, 4, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 192);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(192));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 2, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 4, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 0, 5, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 4, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(2, 9, 4, 64, 384);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(384));
+
+            // 1/4 rest
+            vTaskDelay(pdMS_TO_TICKS(384));
         }
     }
 
@@ -653,6 +815,7 @@ extern "C" void app_init(void)
     configASSERT(audio != nullptr);   // Confirm task was successfully created!
     xAudioQueue = xQueueCreate(10, sizeof(Command_t));
     configASSERT(xAudioQueue != nullptr);   // Confirm queue was successfully created!
+    xAudioTaskHandle = audio;
 
     // Launch melody task
     TaskHandle_t melody = xTaskCreateStatic(melodyTask, "melody", kMelodyStackWords,

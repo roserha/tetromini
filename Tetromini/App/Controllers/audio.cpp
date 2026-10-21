@@ -28,56 +28,74 @@ void AudioController::processAudioCallback(bool secondHalf)
     uint16_t offset = secondHalf ? 128 : 0;
     uint16_t end = 128 + offset;
 
-    for (uint_fast16_t j = offset; j < end; j+=2)
+    int16_t* begin = (*_audioDMABuffer).begin();
+
+    // Empty out this half of the buffer
+    std::fill(begin + offset, begin + end, 0);
+
+    // Entirely skip unused channels
+    for (uint_fast8_t c = 0; c < kChannelNumber; c++)
     {
-        float tempSampleAllChannels = 0;
+        SoundChannel_t currentChannel = Channels[c];
+        float currentChannelPhase = currentChannel.phase;
+        float currentChannelJump = currentChannel.jump;
+        uint32_t currentChannelTimeout = currentChannel.timeout;
+        uint8_t currentChannelWave = currentChannel.channelWave;
+        uint8_t currentChannelVolume = currentChannel.volume;
 
-        for (uint_fast8_t i = 0; i < kChannelNumber; i++)
+        // skip if channel is muted
+        if (currentChannelVolume == 0)
+            continue;
+
+        // Take advantage of contiguous memory
+        for (uint_fast16_t s = offset; s < end; s+=2)
         {
-            float tempSamplePerChannel = 0;
-            SoundChannel_t currentChannel = Channels[i];
+            // Retrieve sample affected by other channels and initalize int16 version of it
+            float CurrentDMASampleAsFloat = (*_audioDMABuffer)[s];
+            int16_t CurrentDMASample = 0;
 
-            // skip if channel is muted
-            if (currentChannel.volume == 0)
-                continue;
-
-            float currentRawPhase = currentChannel.phase;
-            uint32_t currentPhase = static_cast<int>(currentRawPhase + 0.5) % 600;
+            // Get current sample from channel and scale its volume
+            float SampleToApply = 0.0f;
+            uint32_t currentPhase = static_cast<uint32_t>(currentChannelPhase + 0.5) % 600;
             
-            switch (currentChannel.channelWave)
+            switch (currentChannelWave)
             {
-                case 1: tempSamplePerChannel = kSineWave[currentPhase];         break;
-                case 2: tempSamplePerChannel = kAKWF_eguitar_002[currentPhase]; break;
-                case 3: tempSamplePerChannel = kAKWF_ebass_061[currentPhase];   break;
+                case 1: SampleToApply += kSineWave[currentPhase];         break;
+                case 2: SampleToApply += kAKWF_eguitar_002[currentPhase]; break;
+                case 3: SampleToApply += kAKWF_ebass_061[currentPhase];   break;
                 default: break;
             }
 
-            tempSampleAllChannels += (tempSamplePerChannel * currentChannel.volume) / 128.0;
+            SampleToApply *= currentChannelVolume / 128.0f;
+            CurrentDMASampleAsFloat += SampleToApply;
 
-            float nextPhase = (currentRawPhase + currentChannel.jump);
-            while (nextPhase > 600)
+            // Proceed to next sample inside channel
+            currentChannelPhase += currentChannelJump;
+            while (currentChannelPhase > 600)
             {
-                nextPhase -= 600;
+                currentChannelPhase -= 600;
             }
 
-            Channels[i].phase = nextPhase;
+            if (CurrentDMASampleAsFloat > 32767)
+                CurrentDMASample = 32767;
+            else if (CurrentDMASampleAsFloat < -32768)
+                CurrentDMASample = -32768;
+            else
+                CurrentDMASample = static_cast<int16_t>(CurrentDMASampleAsFloat);
+
+            (*_audioDMABuffer)[s] = CurrentDMASample;
+            (*_audioDMABuffer)[s+1] = CurrentDMASample;
 
             // reset channel if timeout == 0
-            if (--Channels[i].timeout == 0)
+            if (--currentChannelTimeout == 0)
             {
-                Channels[i] = SoundChannel_t { 0.0, 0.0, 0, 0, 0 };
+                currentChannelJump = currentChannelPhase = 0.0;
+                currentChannelVolume = currentChannelWave = 0;
+                break;
             }
         }
 
-        if (tempSampleAllChannels > 32767)
-            tempSampleAllChannels = 32767;
-
-        if (tempSampleAllChannels < -32768)
-            tempSampleAllChannels = -32768;
-
-        int16_t clampedSample = static_cast<int>(tempSampleAllChannels);
-
-        (*_audioDMABuffer)[j] = clampedSample;
-        (*_audioDMABuffer)[j+1] = clampedSample;
+        // Save altered channel info
+        Channels[c] = SoundChannel_t {currentChannelPhase, currentChannelJump, currentChannelTimeout, currentChannelWave, currentChannelVolume};
     }
 }
