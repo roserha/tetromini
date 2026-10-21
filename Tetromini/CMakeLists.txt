@@ -60,6 +60,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/Controllers/sprites.cpp
     App/Controllers/tetromino.cpp
     App/Controllers/playfield.cpp
+    App/Controllers/audio.cpp
 )
 
 # Add include paths

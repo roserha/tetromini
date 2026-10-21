@@ -4,6 +4,7 @@
 #include "FreeRTOS.h"    // FreeRTOS necessities
 #include "semphr.h"      // Mutexes!
 #include "task.h"        // Task logic
+#include <array>         // Arrays
 
 #include "ssd1309.hpp"   // OLED Controller Driver
 #include "spi.h"         // SSD1309 communicates via SPI 
@@ -16,6 +17,7 @@
 #include "sprites.hpp"   // Sprites controller
 #include "tetromino.hpp" // Tetromino controller
 #include "playfield.hpp" // Playfield controller
+#include "audio.hpp"     // Audio controller
 
 namespace {
 
@@ -36,6 +38,7 @@ namespace {
         CMD_POWER_BTN,
         CMD_AUDIO_DMA_HALF_COMPLETE,
         CMD_AUDIO_DMA_COMPLETE,
+        CMD_AUDIO_DMA_ERROR,
         CMD_AUDIO_PLAY_SOUND
     } CommandType_t;
 
@@ -130,10 +133,10 @@ namespace {
             uint32_t computedVoltage = 0;
             uint_fast8_t computedPercentage = 0;
 
-            int successfulReadings = 0;
+            uint_fast8_t successfulReadings = 0;
 
             // Attempt 10 readings from ADC
-            for (int i = 0; successfulReadings < 10 && i < 20; i++)
+            for (uint_fast8_t i = 0; successfulReadings < 10 && i < 20; i++)
             {
                 uint32_t temporaryVoltage = 0;
 
@@ -171,11 +174,11 @@ namespace {
                 computedVoltage = readVoltage * 1.61172161;
     
                 // Calculate percentage
-                int lower_bound_idx = -1; int64_t lower_bound = 0;
-                int upper_bound_idx = -1; int64_t upper_bound = 0;
+                int32_t lower_bound_idx = -1; int64_t lower_bound = 0;
+                int32_t upper_bound_idx = -1; int64_t upper_bound = 0;
     
                 // Get lower and upper bounds
-                for (int i = 0; i <= 10; i++)
+                for (size_t i = 0; i <= 10; i++)
                 {
                     if (battery_mv_percentages[i] < computedVoltage)
                     {
@@ -249,30 +252,162 @@ namespace {
     constexpr uint32_t    kAudioStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
     StackType_t           audioStack[kAudioStackWords];            // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          audioTcb;                                // FreeRTOS task control block for the task
-    constexpr UBaseType_t kAudioPriority = tskIDLE_PRIORITY + 2;   // 2 levels above idle (higher = more important)
-    QueueHandle_t xAudioCommandsQueue = NULL;                      // Audio commands queue
+    constexpr UBaseType_t kAudioPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+    QueueHandle_t         xAudioQueue = NULL;                      // Notes queue to avoid race conditions
+
+
+
+    // With the way we process the DMA, we can get away without a semaphore
+    // in favor of the audio commands queue!
+
+    volatile bool audioDmaFailed = false; // written in ISR, read in task
+
+    static constexpr std::array<uint16_t, 12> noteToFrequency = {
+        4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902
+    };
 
     void audioTask(void *)
     {
-        // this buffer stores 256 audio frames, which in 48kHz defaults to ~5.3ms (256/48)
-        int16_t audioDMABuffer [256] = {0};
+        // this buffer stores 256 audio frames of "interweaved" stereo, which in 48kHz defaults to ~2.6ms (128/48)
+        // with dma, we *NEED* to refill things in at !MOST! 1.3ms
+        std::array<int16_t, 256> audioDMABuffer = {0};
 
-        // Initialize it with a simple square wave
-        // For initial DMA logic, a full wave needs to play in 2.6ms at MOST. So fundamental
-        // frequency is 375. Let's set period to 1.333 so we have a 750Hz wave
-        // this means repeating stuff twice inside the wave
-        for (int i = 0; i < 256; i++)
-        {
-            audioDMABuffer[i] = ((i % 128) << 6) - 4096;
-        }
+        // Initialize audio controller
+        AudioController audioController { &audioDMABuffer };
 
-        HAL_StatusTypeDef audioDMAStatus = HAL_I2S_Transmit_DMA(&hi2s2, (uint16_t*)audioDMABuffer, 256);
-
+        // Initialize DMA protocol
+        HAL_StatusTypeDef audioDMAStatus = HAL_I2S_Transmit_DMA(&hi2s2, (uint16_t*)(audioDMABuffer.data()), 256);
         configASSERT(audioDMAStatus == HAL_OK);
+
+        HAL_GPIO_WritePin(AUDIO_SHUTDOWN_GPIO_Port, AUDIO_SHUTDOWN_Pin, GPIO_PIN_SET);
+
+        Command_t xReceivedCommand;
 
         for (;;)
         {
-            vTaskDelay(portMAX_DELAY);
+            // Wait for audio commands
+            if (xQueueReceive(xAudioQueue, &xReceivedCommand, portMAX_DELAY) == pdTRUE)
+            {
+                if (xReceivedCommand.cmdType != CMD_AUDIO_PLAY_SOUND)
+                {
+                    switch (xReceivedCommand.cmdType)
+                    {
+                        case CMD_AUDIO_DMA_HALF_COMPLETE: /* half complete */ audioController.processAudioCallback(false);  break;
+                        case CMD_AUDIO_DMA_COMPLETE: /* complete */           audioController.processAudioCallback(true);   break;
+                        default: break;
+                    }
+                } else
+                {
+                    uint32_t noteInfo = xReceivedCommand.cmdInfo;
+                    uint16_t note = 0x1F & noteInfo;
+    
+                    if (note > 11)
+                        continue;
+    
+                    uint16_t octave = (0xE0 & noteInfo) >> 5;
+    
+                    uint16_t frequency = noteToFrequency[note] >> (8 - octave);
+    
+                    audioController.playWave(
+                        (0x7F800000 & noteInfo) >> 23,
+                        frequency,
+                        (0xFF00 & noteInfo) >> 6,
+                        (0x7F0000 & noteInfo) >> 16
+                    );
+                }
+            }
+        }
+    }
+
+    extern "C" void HAL_I2S_ErrorCallback(I2S_HandleTypeDef *hi2s)
+    {
+        if (hi2s == &hi2s2 && xAudioQueue != NULL)
+        {
+            audioDmaFailed = true;
+
+            Command_t cmd = { CMD_AUDIO_DMA_ERROR, 0, nullptr };
+            BaseType_t higherPriorityTaskWoken = pdFALSE;
+            xQueueSendToFrontFromISR(xAudioQueue, (void*)&cmd, &higherPriorityTaskWoken);
+            //configASSERT( == pdPASS);
+            portYIELD_FROM_ISR(higherPriorityTaskWoken);
+        }
+    }
+
+    extern "C" void HAL_I2S_TxHalfCpltCallback(I2S_HandleTypeDef *hi2s)
+    {
+        if (hi2s == &hi2s2 && xAudioQueue != NULL)
+        {
+            Command_t cmd = { CMD_AUDIO_DMA_HALF_COMPLETE, 0, nullptr };
+            BaseType_t higherPriorityTaskWoken = pdFALSE;
+            xQueueSendToFrontFromISR(xAudioQueue, (void*)&cmd, &higherPriorityTaskWoken);
+            //configASSERT( == pdPASS);
+            portYIELD_FROM_ISR(higherPriorityTaskWoken);
+        }
+    }
+
+    extern "C" void HAL_I2S_TxCpltCallback(I2S_HandleTypeDef *hi2s)
+    {
+        if (hi2s == &hi2s2 && xAudioQueue != NULL)
+        {
+            Command_t cmd = { CMD_AUDIO_DMA_HALF_COMPLETE, 0, nullptr };
+            BaseType_t higherPriorityTaskWoken = pdFALSE;
+            xQueueSendToFrontFromISR(xAudioQueue, (void*)&cmd, &higherPriorityTaskWoken);
+            //configASSERT( == pdPASS);
+            portYIELD_FROM_ISR(higherPriorityTaskWoken);
+        }
+    }
+
+    /////////////////////////////////////////////////////////////////////////
+    // Melody Thread
+    /////////////////////////////////////////////////////////////////////////
+    
+    constexpr uint32_t    kMelodyStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
+    StackType_t           melodyStack[kMelodyStackWords];            // the task's own stack (32-bit words on Cortex-M)
+    StaticTask_t          melodyTcb;                                // FreeRTOS task control block for the task
+    constexpr UBaseType_t kMelodyPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+
+    void melodyTask(void *)
+    {
+        Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, 0, nullptr};
+
+        for(;;)
+        {
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 4, 5, 10, 512);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(512));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 11, 4, 10, 256);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(256));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 0, 5, 10, 256);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(256));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 1, 5, 10, 512);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(512));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 0, 5, 10, 256);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(256));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 11, 4, 10, 256);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(256));
+
+            noteToPlay.cmdInfo = AudioController::sampleToUlValue(1, 9, 4, 10, 512);
+            xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+
+            vTaskDelay(pdMS_TO_TICKS(512));
+
+            vTaskDelay(pdMS_TO_TICKS(4096));
         }
     }
 
@@ -342,13 +477,46 @@ namespace {
                 switch (ScreenState)
                 {
                     case SCREEN_MAINMENU:
-                        switch (xReceivedCmd.cmdType)
+                        if (xReceivedCmd.cmdInfo == 0)
                         {
-                            // Open game when releasing pause
-                            case CMD_START_BTN:  if (xReceivedCmd.cmdInfo == 0) ScreenState = SCREEN_GAME;  break;
-                            default:                                                                        break;
+                            switch (xReceivedCmd.cmdType)
+                            {
+                                // Open game when releasing pause
+                                case CMD_START_BTN:   ScreenState = SCREEN_GAME;  break;
+                                case CMD_ROT_CCW_BTN: {
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 0, 5, 10, 250), nullptr};
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    
+                                } break;
+                                case CMD_ROT_CW_BTN:  {
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 2, 5, 10, 250), nullptr};
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    
+                                } break;
+                                case CMD_UP_BTN:      {
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 4, 5, 10, 250), nullptr};
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    
+                                } break;
+                                case CMD_DOWN_BTN:    {
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 5, 5, 10, 250), nullptr};
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    
+                                } break;
+                                case CMD_LEFT_BTN:    {
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 7, 5, 10, 250), nullptr};
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    
+                                } break;
+                                case CMD_RIGHT_BTN:   {
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 9, 5, 10, 250), nullptr};
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    
+                                } break;
+                                default:                                                                        break;
+                            }
+                            break;
                         }
-                        break;
 
                     default: break;
                 }
@@ -426,7 +594,7 @@ namespace {
         GPIO_TypeDef *port = (gpioPin >= BTN_CW_Pin) ? GPIOB : GPIOC;
         GPIO_PinState state = HAL_GPIO_ReadPin(port, gpioPin);
         
-        uint32_t info = (uint32_t)(state == GPIO_PIN_SET);
+        uint32_t info = (state != GPIO_PIN_SET) ? 1 : 0;
         
         Command_t inputCmd = {CMD_NO_OP, info, nullptr};
         
@@ -483,8 +651,14 @@ extern "C" void app_init(void)
                                        nullptr, kAudioPriority,
                                        audioStack, &audioTcb);
     configASSERT(audio != nullptr);   // Confirm task was successfully created!
-    xAudioCommandsQueue = xQueueCreate(10, sizeof(Command_t));
-    configASSERT(xAudioCommandsQueue != nullptr);   // Confirm queue was successfully created!
+    xAudioQueue = xQueueCreate(10, sizeof(Command_t));
+    configASSERT(xAudioQueue != nullptr);   // Confirm queue was successfully created!
+
+    // Launch melody task
+    TaskHandle_t melody = xTaskCreateStatic(melodyTask, "melody", kMelodyStackWords,
+                                       nullptr, kMelodyPriority,
+                                       melodyStack, &melodyTcb);
+    configASSERT(melody != nullptr);   // Confirm task was successfully created!
 
     // Launch game task
     TaskHandle_t game = xTaskCreateStatic(gameTask, "game", kGameStackWords,

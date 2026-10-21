@@ -62,7 +62,7 @@ with open(path, "w", encoding="utf-8") as file:
     file.write(separator)
     file.write(original_contents[2])
     file.write(separator)
-    file.write(f"\n        static constexpr std::array<uint8_t, {sprite_byte_count}> _sprite_array = {{\n")
+    file.write(f"\n        static constexpr std::array<uint8_t, {sprite_byte_count}> kSpriteArray = {{\n")
     for line in c_sprites_def:
         file.write(f"{line}\n")
     file.write("        };\n\n        ")

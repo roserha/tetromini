@@ -104,7 +104,7 @@ bool TetrominoController::drawPhantomTetromino(uint_fast8_t x, uint_fast8_t y, T
     bool OutOfBounds = false;
     std::array<uint8_t, 8> Coordinates = getTetrominoPositions(x, y, block_type, spin_state);
 
-    for (int i = 0; i < 8; i += 2)
+    for (uint_fast8_t i = 0; i < 8; i += 2)
     {
         uint_fast8_t x = Coordinates[i];
         uint_fast8_t y = Coordinates[i+1];

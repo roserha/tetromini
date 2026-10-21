@@ -7,7 +7,7 @@ uint8_t SpritesController::drawSprite(uint_fast8_t sprite_id, uint_fast8_t x, ui
         return 0;
     }
 
-    const uint8_t *sprite_to_draw = &_sprite_array[sprite_id * 7];
+    const uint8_t *sprite_to_draw = &kSpriteArray[sprite_id * 7];
     const uint8_t hor_res = sprite_to_draw[0];
     
     for (int i = 0; i < hor_res; i++)

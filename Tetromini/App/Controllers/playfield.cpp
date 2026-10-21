@@ -48,5 +48,5 @@ void PlayfieldController::renderPlayfieldHeader()
 
 	_spritesController->drawText(113, 34, "Next:");
 
-    _spritesController->drawSprite(70 + ((int)nextPiece), 113, 57);
+    _spritesController->drawSprite(70 + ((uint8_t)nextPiece), 113, 57);
 }

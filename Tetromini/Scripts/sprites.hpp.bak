@@ -89,7 +89,7 @@ class SpritesController {
         // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
         ///////////////////////////////////////////////////////////
 
-        static constexpr std::array<uint8_t, 749> _sprite_array = {
+        static constexpr std::array<uint8_t, 749> kSpriteArray = {
             6, 0b111111, 0b100001, 0b101101, 0b101101, 0b100001, 0b111111,
             6, 0b111111, 0b110101, 0b101011, 0b110101, 0b101011, 0b111111,
             6, 0b111111, 0b100001, 0b100001, 0b100001, 0b100001, 0b111111,

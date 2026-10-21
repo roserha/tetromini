@@ -82,6 +82,8 @@ void Error_Handler(void);
 #define BTN_POWER_Pin GPIO_PIN_14
 #define BTN_POWER_GPIO_Port GPIOB
 #define BTN_POWER_EXTI_IRQn EXTI15_10_IRQn
+#define AUDIO_SHUTDOWN_Pin GPIO_PIN_15
+#define AUDIO_SHUTDOWN_GPIO_Port GPIOB
 #define BTN_LEFT_Pin GPIO_PIN_6
 #define BTN_LEFT_GPIO_Port GPIOC
 #define BTN_LEFT_EXTI_IRQn EXTI9_5_IRQn

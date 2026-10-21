@@ -186,14 +186,14 @@ class PlayfieldController {
         // root on vector and rotational matrix multiplication!
 
         // Sadly, we have to store them all explicitly to make computation easier... I'm sorry, stack :v
-        static constexpr std::array<int8_t, 40> JLSTZ_Offsets = {
+        static constexpr std::array<int8_t, 40> kJLSTZ_Offsets = {
         0, 0,    0, 0,    0, 0,    0, 0,    0, 0,
         0, 0,    1, 0,    1,-1,    0, 2,    1, 2,
         0, 0,    0, 0,    0, 0,    0, 0,    0, 0,
         0, 0,   -1, 0,   -1,-1,    0, 2,   -1, 2
         };
 
-        static constexpr std::array<int8_t, 40> I_Offsets = {
+        static constexpr std::array<int8_t, 40> kI_Offsets = {
             0, 0,   -1, 0,    2, 0,   -1, 0,    2, 0,
            -1, 0,    0, 0,    0, 0,    0, 1,    0,-2,
            -1, 1,    1, 1,   -2, 1,    1, 0,   -2, 0,
@@ -202,7 +202,7 @@ class PlayfieldController {
 
         // These values are either false for -1 and true for 0 (bc i can just do O_Offset[i] + 1)
         // This is my way to at least save SOME space.
-        static constexpr std::array<bool, 8> O_Offsets = {
+        static constexpr std::array<bool, 8> kO_Offsets = {
             true, true,
             true,false,
             false,false,
