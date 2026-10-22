@@ -35,13 +35,22 @@ enable_language(C CXX ASM)
 add_executable(${CMAKE_PROJECT_NAME})
 
 # Generate sprite data before building the firmware
-add_custom_target(run_python_script
+add_custom_target(make_sprites
     COMMAND python3 "${CMAKE_SOURCE_DIR}/Scripts/sprite_factory.py"
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Scripts"
     VERBATIM
 )
 
-add_dependencies(${CMAKE_PROJECT_NAME} run_python_script)
+add_dependencies(${CMAKE_PROJECT_NAME} make_sprites)
+
+# Generate melody data before building the firmware
+add_custom_target(make_melodies
+    COMMAND python3 "${CMAKE_SOURCE_DIR}/Scripts/song_factory.py"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/Scripts"
+    VERBATIM
+)
+
+add_dependencies(${CMAKE_PROJECT_NAME} make_melodies)
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
@@ -61,6 +70,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     App/Controllers/tetromino.cpp
     App/Controllers/playfield.cpp
     App/Controllers/audio.cpp
+    App/Controllers/melody.cpp
 )
 
 # Add include paths

@@ -1,4 +1,4 @@
-# This script is responsible for generating the sprites used in sprites.h and sprites.c
+# This script is responsible for generating the sprites used in sprites.hpp
 
 from PIL import Image
 import shutil
@@ -17,6 +17,7 @@ c_sprites_def = []
 sprite_byte_count = 0
 
 # Sprite transcription
+# Essentially we store their horizontal length, and then their pixels top to bottom column first
 
 with Image.open("sprites.bmp") as im:
     for i in range(441):

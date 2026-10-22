@@ -10,7 +10,8 @@ void AudioController::playWave(const uint8_t waveId, const uint16_t pitch, const
     newChannelInfo.channelWave = waveId;
     newChannelInfo.jump = 600 / kDesiredLambda;
     newChannelInfo.phase = 0;
-    newChannelInfo.timeout = 48 * time;
+    newChannelInfo.length = 48 * time;
+    newChannelInfo.timeout = newChannelInfo.length;
     newChannelInfo.volume = volume;
 
     for (uint32_t i = 0; i < kChannelNumber; i++)
@@ -40,6 +41,7 @@ void AudioController::processAudioCallback(bool secondHalf)
         float currentChannelPhase = currentChannel.phase;
         float currentChannelJump = currentChannel.jump;
         uint32_t currentChannelTimeout = currentChannel.timeout;
+        uint32_t currentChannelLength = currentChannel.length;
         uint8_t currentChannelWave = currentChannel.channelWave;
         uint8_t currentChannelVolume = currentChannel.volume;
 
@@ -66,6 +68,17 @@ void AudioController::processAudioCallback(bool secondHalf)
                 default: break;
             }
 
+            // Apply attack and decay to avoid cracking
+            // Essentially decrease amplitude linearly if song is within 256 samples of its beginning or end
+            if (currentChannelTimeout < 256)
+            {
+                SampleToApply *= currentChannelTimeout / 256.0f;
+            } else if (currentChannelLength - currentChannelTimeout < 256)
+            {
+                SampleToApply *= (currentChannelLength - currentChannelTimeout) / 256.0f;
+            }
+
+            // Apply volume and add to DMA sample float
             SampleToApply *= currentChannelVolume / 128.0f;
             CurrentDMASampleAsFloat += SampleToApply;
 
@@ -76,6 +89,7 @@ void AudioController::processAudioCallback(bool secondHalf)
                 currentChannelPhase -= 600;
             }
 
+            // Clamp sample to avoid overflows
             if (CurrentDMASampleAsFloat > 32767)
                 CurrentDMASample = 32767;
             else if (CurrentDMASampleAsFloat < -32768)
@@ -90,12 +104,12 @@ void AudioController::processAudioCallback(bool secondHalf)
             if (--currentChannelTimeout == 0)
             {
                 currentChannelJump = currentChannelPhase = 0.0;
-                currentChannelVolume = currentChannelWave = 0;
+                currentChannelVolume = currentChannelWave = currentChannelLength = 0;
                 break;
             }
         }
 
         // Save altered channel info
-        Channels[c] = SoundChannel_t {currentChannelPhase, currentChannelJump, currentChannelTimeout, currentChannelWave, currentChannelVolume};
+        Channels[c] = SoundChannel_t {currentChannelPhase, currentChannelJump, currentChannelTimeout, currentChannelWave, currentChannelVolume, currentChannelLength};
     }
 }

@@ -9,6 +9,7 @@ typedef struct {
     uint32_t timeout;
     uint8_t channelWave;
     uint8_t volume;
+    uint32_t length;
 } SoundChannel_t;
 
 class AudioController {
@@ -57,21 +58,20 @@ class AudioController {
          * @param length how long sample should last [4, 2048) (4ms resolution, floored)
          * @returns 32-bit word arranged with masks as follows: `0x1F` for note (N), `0xE0` for octave (C), `0xFF00` for length (L), 
          * `0x7F0000` for volume (V), `0x7F800000` for waveId (W) for word
-         * (`0b0WWW WWWW WVVV VVVV LLLL LLLL CCCN NNNN`)
-         *               1010 0000 1111 1010 1000 1001
-         *               1010 0000 0111 1100 1000 1001
+         * (`0b0WWW WWWW WVVV VVVV LLLL LLLL CCCN NNNN`). Most significant bit is restricted to indicate a wait time on stored songs :)
          */
         static uint32_t sampleToUlValue(uint32_t waveNumber, uint32_t note, uint32_t octave, uint32_t volume, uint32_t length)
         {
             if (octave == 0)
                 return 0;
-            uint32_t value = (note & 0x1fL) | ((octave & 0x7L) << 5L) | ((length & 0x7f8L) << 6L) | ((volume & 0x7fL) << 16L) | ((waveNumber & 0xffL) << 23L);
+            uint32_t value = (note & 0x1fL) | ((octave & 0x7L) << 5L) | ((length & 0x7fL) << 6L) | ((volume & 0x7fL) << 16L) | ((waveNumber & 0xffL) << 23L);
             return value;
         }
 
     private:
-        static constexpr uint32_t kChannelNumber = 4;
+        static constexpr uint32_t kChannelNumber = 8;
         std::array<SoundChannel_t, kChannelNumber> Channels;
+        uint16_t lastSample = 0; // <- to avoid snaps in between repeated notes
 
         std::array<int16_t, 256>* _audioDMABuffer;
 
