@@ -20,35 +20,9 @@
 #include "audio.hpp"     // Audio controller
 #include "melody.hpp"    // Melody controller
 
-namespace {
+#include "types.hpp"
 
-    /////////////////////////////////////////////////////////////////////////
-    // Inter-thread commands
-    /////////////////////////////////////////////////////////////////////////
-
-    typedef enum {
-        CMD_NO_OP,
-        CMD_BEGIN_RENDER,
-        CMD_UP_BTN,
-        CMD_DOWN_BTN,
-        CMD_LEFT_BTN,
-        CMD_RIGHT_BTN,
-        CMD_ROT_CCW_BTN,
-        CMD_ROT_CW_BTN,
-        CMD_START_BTN,
-        CMD_POWER_BTN,
-        CMD_AUDIO_DMA_HALF_COMPLETE,
-        CMD_AUDIO_DMA_COMPLETE,
-        CMD_AUDIO_DMA_ERROR,
-        CMD_AUDIO_PLAY_SOUND
-    } CommandType_t;
-
-    typedef struct {
-        CommandType_t cmdType;
-        uint32_t cmdInfo;
-        void * cmdPayload;
-    } Command_t;
-    
+namespace {   
 
     /////////////////////////////////////////////////////////////////////////
     // Render Thread
@@ -427,11 +401,14 @@ namespace {
     void gameTask(void *)
     {
 
+        // Salt for pseudo RNG
+        uint32_t salt = 0;
+
         // Initialize all the controllers
         GraphicsController graphicsController {&FrameBuffer, &xFrameBufferMutex};
         SpritesController spritesController {&graphicsController};
         TetrominoController tetrominoController {&spritesController};
-        PlayfieldController playfieldController {&tetrominoController, &spritesController, &graphicsController};
+        PlayfieldController playfieldController {&tetrominoController, &spritesController, &graphicsController, &salt, xAudioQueue};
 
         // Get initial start time and set target time
         TickType_t xFrameStartTime = 0;
@@ -466,42 +443,49 @@ namespace {
             Command_t xReceivedCmd;
             while (xQueueReceive(xGameInputQueue, &xReceivedCmd, pdMS_TO_TICKS(1)) == pdTRUE)
             {
+                salt += 26489;
+                if (salt >= 2147457158)
+                    salt -= 2147457158;
+
                 switch (ScreenState)
                 {
                     case SCREEN_MAINMENU:
-                        if (xReceivedCmd.cmdInfo == 0)
+                        if (xReceivedCmd.cmdInfo == 0) // Releasing
                         {
                             switch (xReceivedCmd.cmdType)
                             {
                                 // Open game when releasing pause
-                                case CMD_START_BTN:   ScreenState = SCREEN_GAME;  break;
+                                case CMD_START_BTN:   {
+                                    ScreenState = SCREEN_GAME; 
+                                    playfieldController.initializePlayfield();  
+                                } break;
                                 case CMD_ROT_CCW_BTN: {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 0, 5, 10, 250), nullptr};
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 0, 5, 64, 250), nullptr};
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     
                                 } break;
                                 case CMD_ROT_CW_BTN:  {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 2, 5, 10, 250), nullptr};
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 2, 5, 64, 250), nullptr};
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     
                                 } break;
                                 case CMD_UP_BTN:      {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 4, 5, 10, 250), nullptr};
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 4, 5, 64, 250), nullptr};
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     
                                 } break;
                                 case CMD_DOWN_BTN:    {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 5, 5, 10, 250), nullptr};
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 5, 5, 64, 250), nullptr};
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     
                                 } break;
                                 case CMD_LEFT_BTN:    {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 7, 5, 10, 250), nullptr};
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 7, 5, 64, 250), nullptr};
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     
                                 } break;
                                 case CMD_RIGHT_BTN:   {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(2, 9, 5, 10, 250), nullptr};
+                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 9, 5, 64, 250), nullptr};
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     
                                 } break;
@@ -510,10 +494,36 @@ namespace {
                             break;
                         }
 
+                    case SCREEN_GAME:
+                    {
+                        if (xReceivedCmd.cmdInfo == 1) // Pressing
+                        {
+                            switch (xReceivedCmd.cmdType)
+                            {
+                                case CMD_RIGHT_BTN:   playfieldController.moveCurrentPiece(true);    break;
+                                case CMD_LEFT_BTN:    playfieldController.moveCurrentPiece(false);   break;
+                                case CMD_ROT_CCW_BTN: playfieldController.rotateCurrentPiece(false); break;
+                                case CMD_ROT_CW_BTN:  playfieldController.rotateCurrentPiece(true);  break;
+                                case CMD_DOWN_BTN:    playfieldController.setSoftDropStatus(true);   break;
+                                case CMD_UP_BTN:      playfieldController.hardDropCurrentPiece();    break;
+                                default:                                                             break;
+                            }
+                        }
+                        else
+                        {
+                            switch (xReceivedCmd.cmdType) // Releasing
+                            {
+                                case CMD_DOWN_BTN:    playfieldController.setSoftDropStatus(false);   break;
+                                default:                                                             break;
+                            }
+                        }
+                    } break;
+
                     default: break;
                 }
             }
 
+            // Per-screen behaviours
             switch (ScreenState)
             {
                 case SCREEN_MAINMENU:
@@ -543,6 +553,7 @@ namespace {
 
                 case SCREEN_GAME:
                 {
+                    playfieldController.tickPlayfield(deltaTime, xFrameStartTime);
                     playfieldController.renderPlayfield();
                     playfieldController.renderPlayfieldHeader();
                     break;

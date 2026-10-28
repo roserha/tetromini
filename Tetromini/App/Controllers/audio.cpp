@@ -58,33 +58,37 @@ void AudioController::processAudioCallback(bool secondHalf)
 
             // Get current sample from channel and scale its volume
             float SampleToApply = 0.0f;
-            uint32_t currentPhase = static_cast<uint32_t>(currentChannelPhase + 0.5) % 600;
+            uint32_t currentPhase = static_cast<uint32_t>(currentChannelPhase);
             
             switch (currentChannelWave)
             {
                 case 1: SampleToApply += kSineWave[currentPhase];         break;
                 case 2: SampleToApply += kAKWF_eguitar_002[currentPhase]; break;
                 case 3: SampleToApply += kAKWF_ebass_061[currentPhase];   break;
+                case 4: SampleToApply += kAKWF_vgame_059[currentPhase];   break;
                 default: break;
             }
 
             // Apply attack and decay to avoid cracking
-            // Essentially decrease amplitude linearly if song is within 256 samples of its beginning or end
-            if (currentChannelTimeout < 256)
+            // Essentially decrease amplitude linearly if song is within 128 samples of its beginning or end
+            // While also applying volume
+            if (currentChannelTimeout < 128)
             {
-                SampleToApply *= currentChannelTimeout / 256.0f;
-            } else if (currentChannelLength - currentChannelTimeout < 256)
+                SampleToApply *= currentChannelTimeout * currentChannelVolume / 16384.0f;
+            } else if (currentChannelLength - currentChannelTimeout < 128)
             {
-                SampleToApply *= (currentChannelLength - currentChannelTimeout) / 256.0f;
+                SampleToApply *= (currentChannelLength - currentChannelTimeout) * currentChannelVolume / 16384.0f;
+            } else
+            {
+                SampleToApply *= currentChannelVolume / 128.0f;
             }
 
             // Apply volume and add to DMA sample float
-            SampleToApply *= currentChannelVolume / 128.0f;
             CurrentDMASampleAsFloat += SampleToApply;
 
             // Proceed to next sample inside channel
             currentChannelPhase += currentChannelJump;
-            while (currentChannelPhase > 600)
+            while (currentChannelPhase >= 600)
             {
                 currentChannelPhase -= 600;
             }

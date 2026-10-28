@@ -1,13 +1,17 @@
 #pragma once
 #include "tetromino.hpp"
+#include "audio.hpp"
 #include <cstdint>
 #include <array>
+#include <algorithm>
+#include "FreeRTOS.h"    // FreeRTOS necessities
+#include "types.hpp"     // Commands
 
 class PlayfieldController {
     public:
         // Initialize default variables
-        PlayfieldController(TetrominoController* tetrominoController, SpritesController* spritesController, GraphicsController* graphicsController)
-            : _tetrominoController(tetrominoController), _spritesController(spritesController), _graphicsController(graphicsController) {}
+        PlayfieldController(TetrominoController* tetrominoController, SpritesController* spritesController, GraphicsController* graphicsController, uint32_t* salt, QueueHandle_t audioQueue)
+            : _tetrominoController(tetrominoController), _spritesController(spritesController), _graphicsController(graphicsController), _salt(salt), _audioQueue(audioQueue) {}
 
         /**
          * @brief Set block state on bitfield
@@ -82,6 +86,13 @@ class PlayfieldController {
         void moveCurrentPiece(bool right);
 
         /**
+         * @brief Finalize dropping a piece
+         * 
+         * Processes a new piece and registers old piece into playfield
+         */
+        void finishDroppingPiece();
+
+        /**
          * @brief Softly drop the piece
          * 
          * Move the piece down faster than what the level is, without
@@ -95,6 +106,11 @@ class PlayfieldController {
          * Snap the piece down to the phantom piece's position
          */
         void hardDropCurrentPiece();
+
+        /**
+         * @brief Set whether we're softdropping or not
+         */
+        void setSoftDropStatus(bool softDropping);
 
         /**
          * @brief Update phantom piece position
@@ -120,7 +136,7 @@ class PlayfieldController {
          * @param elapsed_time time passed since boot
          */
         // 
-        void tickPlayfield(int64_t delta_time, int64_t elapsed_time, bool *user_data);
+        void tickPlayfield(uint32_t delta_time, uint32_t elapsed_time);
 
     private:
         // We will keep track of the active playfield by borrowing bitboards from chess!!
@@ -129,7 +145,7 @@ class PlayfieldController {
         // With 6 blocks, we can store a tile's blocktype, and naturally b000 means empty!
         // With 10 tiles per row, this means 30 bits per row! Each row can be represented by a 32-bit int, wasting only 2 bits per row!
         // As such, with 22 rows, our entire playfield takes up only 88 bytes!! RAH!!!!! EFFICIENCY!!!!!!!!!
-        uint32_t Playfield [22] = {0};
+        std::array<uint32_t, 22> Playfield = {0};
 
         // Current score
         uint32_t Score = 0;
@@ -168,13 +184,13 @@ class PlayfieldController {
         uint_fast8_t phantomYPos = 20;
 
         // Internal clock of how many ms passed since game start
-        int64_t stopwatch = 0;
+        uint32_t stopwatch = 0;
+
+        // Whether we're soft dropping or not
+        bool softDropping = false;
 
         // Have we checked the playfield for line cleards? Stays true if we have a line clear
         bool checkForLineClear = false;
-
-        // Whether we have finished checking for line clears or not
-        bool finishedCheck = false;
 
         // Indexes of playfield to shift when line clearing
         std::array<uint_fast8_t, 4> indexesToShift = {0};
@@ -217,4 +233,10 @@ class PlayfieldController {
         
         // Instance of Graphics Controller
         GraphicsController* _graphicsController;
+
+        // Salt for RNG
+        uint32_t* _salt;
+
+        // AudioQueue for SFX
+        QueueHandle_t _audioQueue;
 };
