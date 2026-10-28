@@ -26,10 +26,11 @@ Future developments may want to explore things such as:
 - Multi-channel soundtrack played via synthesized notes with custom notes system
 - Multithreaded parallel execution
 
-## Schematics
+## Schematics, PCB and BOM
 The below KiCad schematic is based on Rev 1, running on a breadboard, and set to run on a milled-PCB. (last updated Oct 27th 2026)
 
-![KiCad Schematic](./Resources/schematic_rev_1.png)
+![KiCAD Schematic](./Resources/schematic_rev_1.png)
+![KiCAD PCB](./Resources/pcb_rev_1.png)
 
 Bill Of Materials for Rev 1 (last updated Oct 27th 2026):
 | Reference                                                       | Description                             | MPN      | DigiKey_PN                 | Manufacturer |
