@@ -11,8 +11,7 @@ The project consists of multiple parts. As of writing, the firmware that control
 
 Future developments may want to explore things such as:
 - [ ] Game over screens
-- [ ] High score tracking
-- [ ] A custom PCB Hat for the Feather
+- [ ] High score tracking (?)
 - [ ] A custom enclosure shaped like a T-Block Tetromino
 
 ## Features
@@ -27,24 +26,29 @@ Future developments may want to explore things such as:
 - Multithreaded parallel execution
 
 ## Schematics, PCB and BOM
-The below KiCad schematic is based on Rev 1, running on a breadboard, and set to run on a milled-PCB. (last updated Oct 27th 2026)
+The below KiCad schematic is based on Rev 1, running on a breadboard, and set to run on a PCB under Rev 1a. (last updated Oct 28th 2026)
 
 ![KiCAD Schematic](./Resources/schematic_rev_1.png)
-![KiCAD PCB](./Resources/pcb_rev_1.png)
+![KiCAD PCB](./Resources/pcb_rev_1a.png)
+![KiCAD PCB](./Resources/pcb_rev_1a_oshpark.png)
 
-Bill Of Materials for Rev 1 (last updated Oct 27th 2026):
-| Reference                                                       | Description                             | MPN      | DigiKey_PN                 | Manufacturer |
+Bill Of Materials for Rev 1a (last updated Oct 28th 2026):
+| Reference                                                       | Description                             | MPN      | DigiKey PN                 | Manufacturer |
 |-----------------------------------------------------------------|-----------------------------------------|----------|----------------------------|--------------|
 | U1                                                              | Feather STM32F405 Express               | 4382     | 1528-4382-ND               | Adafruit     |
 | DS1                                                             | Generic 2.42in SSD1309 OLED SPI Display | --       | --                         | HiLetgo      |
 | DS2                                                             | I2S Audio Breakout                      | 14809    | 1568-14809-ND              | Sparkfun     |
 | DOWN1,LEFT1,RIGHT1,ROT_LEFT1,ROT_RIGHT1,UP1,START_BTN,POWER_BTN | Push button switch, generic, two pins   | MJTP1234 | 679-2442-ND                | APEM Inc.    |
+| C1,C2,C3,C4,C5,C6,C7,C8                                         | 100nF Capacitor                         | C320C104K5R5TA | 399-4264-ND          | KEMET        |
 | C9                                                              | 100UF Capacitor                         | 16ZLH100MEFC5X11 | 1189-1148-ND       | Rubycon      |
+| R1,R2,R5,R6,R9,R10,R13,R14                                      | 10kOhm Resistor                         | ROX05SJ10K | A142728CT-ND             | TE Connectivity Passive Product |
+| R3,R4,R7,R8,R11,R12,R15,R16                                     | 100kOhm Resistor                        | WK202070A1003J2200 | 749-WK202070A1003J2200CT-ND | Vishay |
+| SW1                                                             | SPDT Switch                             | SS12SDP2 | 360-2133-ND                | NKK Switches |
 | --                                                              | 8ohm 700MW Speaker                      | CMS-181325-078L100B-67 | 2223-CMS-181325-078L100B-67-ND | Same Sky |
 | --                                                              | Lithium Battery                         | 258      | 1528-1838-ND               | Adafruit     |
 | --                                                              | SMD SWD Header for Feather              | 4048     | 1528-2827-ND               | Adafruit     |
-
-(Resistors, SPDT Slide Switch and 100NF Capacitors are Jellybean parts and weren't purchased through major manufacturers, and therefore aren't reflected in the BOM)
+| --                                                              | Headers for Feather                     | 2886     | 1528-1560-ND               | Adafruit     |
+| --                                                              | Headers for OLED and I2S Breakout       | PPTC071LFBN-RC | S7005-ND             | Sullins Connector Solutions |
 
 ## Firmware and Multithreading
 
