@@ -12,7 +12,7 @@ class MelodyController {
     public:
         MelodyController() {}
 
-        void playSong(uint8_t songId, bool loop);
+        void playSong(const uint8_t songId, const bool loop);
 
         uint32_t getSongMessage();
 

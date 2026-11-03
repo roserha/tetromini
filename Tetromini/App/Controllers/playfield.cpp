@@ -1,6 +1,6 @@
 #include "playfield.hpp"
 
-void PlayfieldController::setBlockState(uint8_t x, uint8_t y, uint8_t block_type)
+void PlayfieldController::setBlockState(const uint8_t x, const uint8_t y, const uint8_t block_type)
 {
     if (x >= 10 || y >= 22 || block_type > 7) { return; }
 
@@ -22,7 +22,7 @@ void PlayfieldController::renderPlayfield()
         {
             uint32_t tileMask = (0b111 << (j * 3));
             uint32_t tileData = (PlayfieldRow & tileMask) >> (j * 3);
-            uint_fast8_t blockStyle = tileData & 0b111;
+            Tetromino_t blockStyle = static_cast<Tetromino_t>(tileData & 0b111);
             _spritesController->drawBlock(j, i, blockStyle);
         }
     }
@@ -90,7 +90,7 @@ Tetromino_t PlayfieldController::pullNewPiece()
     return piece;
 }
 
-bool PlayfieldController::checkForCollision(Tetromino_t block_type, Spin_t spin_state, uint_fast8_t x, uint_fast8_t y)
+bool PlayfieldController::checkForCollision(const Tetromino_t block_type, const Spin_t spin_state, const uint_fast8_t x, const uint_fast8_t y)
 {
     std::array<uint8_t, 8U> Coordinates = _tetrominoController->getTetrominoPositions(x, y, block_type, spin_state);
 
@@ -136,27 +136,27 @@ bool PlayfieldController::checkForCollision(Tetromino_t block_type, Spin_t spin_
     return false;
 }
 
-void PlayfieldController::rotateCurrentPiece(bool right)
+void PlayfieldController::rotateCurrentPiece(const bool clockwise)
 {
     Spin_t desiredSpinState = currentSpinState;
 
     switch (currentSpinState)
     {
         case ZeroDeg:
-            desiredSpinState = right ? TwoSeventyDeg : NinetyDeg;
+            desiredSpinState = clockwise ? TwoSeventyDeg : NinetyDeg;
             break;
 
         case TwoSeventyDeg:
-            desiredSpinState = right ? OneEightyDeg : ZeroDeg;
+            desiredSpinState = clockwise ? OneEightyDeg : ZeroDeg;
             break;
 
         case OneEightyDeg:
-            desiredSpinState = right ? NinetyDeg : TwoSeventyDeg;
+            desiredSpinState = clockwise ? NinetyDeg : TwoSeventyDeg;
             break;
 
         default:
         case NinetyDeg:
-            desiredSpinState = right ? ZeroDeg : OneEightyDeg;
+            desiredSpinState = clockwise ? ZeroDeg : OneEightyDeg;
             break;
     }
 
@@ -193,7 +193,7 @@ void PlayfieldController::rotateCurrentPiece(bool right)
     }
 }
 
-void PlayfieldController::moveCurrentPiece(bool right)
+void PlayfieldController::moveCurrentPiece(const bool right)
 {
     bool willItCollide = checkForCollision(currentPiece, currentSpinState, pieceXPos + (right ? 1 : -1), pieceYPos);
     if (!willItCollide)
@@ -252,7 +252,7 @@ void PlayfieldController::hardDropCurrentPiece()
     finishDroppingPiece();
 }
 
-void PlayfieldController::setSoftDropStatus(bool status)
+void PlayfieldController::setSoftDropStatus(const bool status)
 {
     softDropping = status;
 }
@@ -282,7 +282,7 @@ void PlayfieldController::initializePlayfield()
     updatePhantomPiecePosition();
 }
 
-void PlayfieldController::tickPlayfield(uint32_t delta_time, uint32_t elapsed_time)
+void PlayfieldController::tickPlayfield(const uint32_t delta_time, const uint32_t elapsed_time)
 {
     // Skip first frame
     if (elapsed_time == 0)

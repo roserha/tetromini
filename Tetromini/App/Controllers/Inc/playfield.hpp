@@ -22,7 +22,7 @@ class PlayfieldController {
          * @param y y coordinate [0,24)
          * @param on pixel color (true = white, false = black)
          */
-        void setBlockState(uint8_t x, uint8_t y, uint8_t block_type);
+        void setBlockState(const uint8_t x, const uint8_t y, const uint8_t block_type);
 
         /**
          * @brief Render active playfield
@@ -62,7 +62,7 @@ class PlayfieldController {
          * 
          * @return bool `true` if a collision happens, `false` otherwise
          */
-        bool checkForCollision(Tetromino_t block_type, Spin_t spin_state, uint_fast8_t x, uint_fast8_t y);
+        bool checkForCollision(const Tetromino_t block_type, const Spin_t spin_state, const uint_fast8_t x, const uint_fast8_t y);
 
         /**
          * @brief Rotate the tetromino clockwise or counterclockwise
@@ -72,7 +72,7 @@ class PlayfieldController {
          * 
          * @param clockwise `true` for clockwise, `false` for counterclockwise
          */
-        void rotateCurrentPiece(bool clockwise);
+        void rotateCurrentPiece(const bool clockwise);
 
         /**
          * @brief Move the tetromino right or left
@@ -83,7 +83,7 @@ class PlayfieldController {
          * @param right `true` for to the right, `false` for to the left
          * @note take it back now yall :danceemoji:
          */
-        void moveCurrentPiece(bool right);
+        void moveCurrentPiece(const bool right);
 
         /**
          * @brief Finalize dropping a piece
@@ -110,7 +110,7 @@ class PlayfieldController {
         /**
          * @brief Set whether we're softdropping or not
          */
-        void setSoftDropStatus(bool softDropping);
+        void setSoftDropStatus(const bool softDropping);
 
         /**
          * @brief Update phantom piece position
@@ -136,7 +136,7 @@ class PlayfieldController {
          * @param elapsed_time time passed since boot
          */
         // 
-        void tickPlayfield(uint32_t delta_time, uint32_t elapsed_time);
+        void tickPlayfield(const uint32_t delta_time, const uint32_t elapsed_time);
 
     private:
         // We will keep track of the active playfield by borrowing bitboards from chess!!

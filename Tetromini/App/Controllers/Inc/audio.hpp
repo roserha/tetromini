@@ -60,7 +60,7 @@ class AudioController {
          * `0x7F0000` for volume (V), `0x7F800000` for waveId (W) for word
          * (`0b0WWW WWWW WVVV VVVV LLLL LLLL CCCN NNNN`). Most significant bit is restricted to indicate a wait time on stored songs :)
          */
-        static uint32_t sampleToUlValue(uint32_t waveNumber, uint32_t note, uint32_t octave, uint32_t volume, uint32_t length)
+        static uint32_t sampleToUlValue(const uint32_t waveNumber, const uint32_t note, const uint32_t octave, const uint32_t volume, const uint32_t length)
         {
             if (octave == 0)
                 return 0;

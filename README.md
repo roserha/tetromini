@@ -125,7 +125,7 @@ sequenceDiagram
 ```
 
 ## Controllers
-Most of the threads' behaviour (specifically the Melody, Audio and Game Threads) are abstracted away inside of **Controller Classes**. This is the overview of what controllers exist inside those threads, and how they interact with each other.
+Most of the threads' behaviour (specifically the Melody, Audio and Game Threads) are abstracted away inside of **Controller Classes**. This is the overview of what controllers exist inside those threads, and how they interact with each other. It isn't an expressly formal Design Structure, but the closest I can think is that it's akin to singleton decorators, in a way? Controllers can "engulf" others to add their behaviours to their own, and we only should have one controller instance existing at a time.
 
 ```mermaid
 ---
@@ -135,96 +135,99 @@ config:
 ---
 classDiagram
   class GraphicsController {
-    +uint_fast8_t kScreenWidth
-    +uint_fast8_t kScreenHeight
-    +uint16_t kFrameBufferSize
-    -std::array<uint8_t, kFrameBufferSize>* _frame_buffer
-    -SemaphoreHandle_t* _xFrameBufferMutex;
-    +void setPixel()
-    +void unfilledRect()
-    +void filledRect()
+    +kScreenWidth : uint_fast8_t 
+    +kScreenHeight : uint_fast8_t 
+    +kFrameBufferSize : uint16_t 
+    -_frame_buffer : std::array<uint8_t, kFrameBufferSize>* 
+    -_xFrameBufferMutex : SemaphoreHandle_t* 
+    +setPixel(const uint_fast8_t x, const uint_fast8_t y, const bool on) : void 
+    +unfilledRect(const uint_fast8_t x, const uint_fast8_t y, const uint_fast8_t w, const uint_fast8_t h, const bool on) : void 
+    +filledRect(const uint_fast8_t x, const uint_fast8_t y, const uint_fast8_t w, const uint_fast8_t h, const bool on) : void 
   }
 
   class SpritesController {
-    -std::array<uint8_t, 749> _sprite_array
-    +uint8_t drawSprite()
-    +bool drawBlock()
-    +uint_fast8_t drawText()
-    +uint_fast8_t drawNumber()
+    -_sprite_array : std::array<uint8_t, 749> 
+    +drawSprite(const uint_fast8_t sprite_id, const uint_fast8_t x, const uint_fast8_t y) : uint8_t 
+    +drawBlock(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type) : bool 
+    +drawText(const uint_fast8_t x, const uint_fast8_t y, const char *sentence) : uint_fast8_t 
+    +drawNumber(const uint_fast8_t x, const uint_fast8_t y, const int32_t number, const uint_fast8_t base) : uint_fast8_t 
   }
 
   class TetrominoController {
-    +getTetrominoPositions()
-    +drawTetromino()
-    +drawPhantomTetromino()
+    +getTetrominoPositions(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type, const Spin_t spin_state) : void
+    +drawTetromino(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type, const Spin_t spin_state) : void
+    +drawPhantomTetromino(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type, const Spin_t spin_state) : void
   }
 
   class PlayfieldController {
-    -uint32_t Playfield[22]
-    -uint32_t Score
-    -uint_fast8_t Level
-    -uint32_t TotalLinesCleared
-    -uint32_t Combo
-    -uint32_t PieceDropTimeout
-    -uint_fast8_t seen_pieces
-    -Tetromino_t nextPiece
-    -Tetromino_t currentPiece
-    -Spin_t currentSpinState
-    -uint_fast8_t pieceXPos
-    -uint_fast8_t pieceYPos
-    -uint_fast8_t phantomYPos
-    -int64_t stopwatch
-    -bool checkForLineClear
-    -bool finishedCheck
-    -std::array<uint_fast8_t, 4> indexesToShift
-    -std::array<int8_t, 40> JLSTZ_Offsets
-    -std::array<int8_t, 40> I_Offsets
-    -std::array<bool, 8> O_Offsets
-    -GraphicsController* _graphicsController
-    -SpritesController* _spritesController
-    -TetrominoController* _tetrominoController
-    +void setBlockState()
-    +void renderPlayfield()
-    +void renderPlayfieldHeader()
-    +Tetromino_t pullNewPiece()
-    +bool checkForCollision()
-    +void rotateCurrentPiece()
-    +void moveCurrentPiece()
-    +void softDropCurrentPiece()
-    +void hardDropCurrentPiece()
-    +void updatePhantomPiecePosition()
-    +void initializePlayfield()
-    +void tickPlayfield()
+    -Playfield[22] : uint32_t 
+    -Score : uint32_t 
+    -Level : uint_fast8_t 
+    -TotalLinesCleared : uint32_t 
+    -Combo : uint32_t 
+    -PieceDropTimeout : uint32_t 
+    -seen_pieces : uint_fast8_t 
+    -nextPiece : Tetromino_t 
+    -currentPiece : Tetromino_t 
+    -currentSpinState : Spin_t 
+    -pieceXPos : uint_fast8_t 
+    -pieceYPos : uint_fast8_t 
+    -phantomYPos : uint_fast8_t 
+    -stopwatch : int64_t 
+    -checkForLineClear : bool 
+    -finishedCheck : bool 
+    -indexesToShift : std::array<uint_fast8_t, 4> 
+    -JLSTZ_Offsets : std::array<int8_t, 40> 
+    -I_Offsets : std::array<int8_t, 40> 
+    -O_Offsets : std::array<bool, 8> 
+    -_graphicsController : GraphicsController* 
+    -_spritesController : SpritesController* 
+    -_tetrominoController : TetrominoController* 
+    -_salt : uint32_t*
+    -_audioQueue : QueueHandle_t
+    +setBlockState(const uint8_t x, const uint8_t y, const uint8_t block_type) : void 
+    +renderPlayfield() : void 
+    +renderPlayfieldHeader() : void 
+    +pullNewPiece() : Tetromino_t
+    +checkForCollision(const Tetromino_t block_type, const Spin_t spin_state, const uint_fast8_t x, const uint_fast8_t y) : bool 
+    +rotateCurrentPiece(const bool clockwise) : void 
+    +moveCurrentPiece(const bool right) : void 
+    +softDropCurrentPiece() : void 
+    +hardDropCurrentPiece() : void 
+    +setSoftDropStatus(const bool status) : void
+    +updatePhantomPiecePosition() : void 
+    +initializePlayfield() : void 
+    +tickPlayfield(const uint32_t delta_time, const uint32_t elapsed_time) : void 
   }
 
   class AudioController {
-    +void playWave()
-    +void processAudioCallback()
-    +uint32_t sampleToUlValue()$
-    -uint32_t kChannelNumber$
-    -std::array<SoundChannel_t, kChannelNumber> Channels
-    -uint16_t lastSample
-    -std::array<int16_t, 256>* _audioDMABuffer
-    -std::array<int16_t, 600> kSineWave$
-    -std::array<int16_t, 600> kAKWF_eguitar_002$
-    -std::array<int16_t, 600> kAKWF_ebass_061$
-    -std::array<int16_t, 600> kAKWF_vgame_059$
+    +playWave(const uint8_t waveId, const uint16_t pitch, const uint16_t time, const uint8_t volume) : void 
+    +processAudioCallback(bool secondHalf) : void 
+    +sampleToUlValue(const uint32_t waveNumber, const uint32_t note, const uint32_t octave, const uint32_t volume, const uint32_t length) : uint32_t $
+    -kChannelNumber : uint32_t $
+    -Channels : std::array<SoundChannel_t, kChannelNumber> 
+    -lastSample : uint16_t 
+    -_audioDMABuffer : std::array<int16_t, 256>*
+    -kSineWave : std::array<int16_t, 600> $
+    -kAKWF_eguitar_002 : std::array<int16_t, 600> $
+    -kAKWF_ebass_061 : std::array<int16_t, 600> $
+    -kAKWF_vgame_059 : std::array<int16_t, 600> $
   }
 
   class MelodyController {
-    +void playSong()
-    +uint32_t getSongMessage()
-    -uint32_t currentSong
-    -uint32_t currentSongMessage
-    -bool shouldSongLoop
-    -std::array<uint32_t, 483> main_song$
+    +playSong(const uint8_t songId, const bool loop) : void 
+    +getSongMessage() : uint32_t 
+    -currentSong : uint32_t 
+    -currentSongMessage : uint32_t 
+    -shouldSongLoop : bool 
+    -main_song : std::array<uint32_t, 483> $
   }
 
-SpritesController..>GraphicsController:Contains pointer to an instance of
-GraphicsController..>TetrominoController:Contains pointer to an instance of
-PlayfieldController..>GraphicsController:Contains pointer to an instance of
-PlayfieldController..>SpritesController:Contains pointer to an instance of
-PlayfieldController..>TetrominoController:Contains pointer to an instance of
+SpritesController "1" ..> "1" GraphicsController
+GraphicsController "1" ..> "1" TetrominoController
+PlayfieldController "1" ..> "1" GraphicsController
+PlayfieldController "1" ..> "1" SpritesController
+PlayfieldController "1" ..> "1" TetrominoController
 ```
 
 ## Sprite Rendering

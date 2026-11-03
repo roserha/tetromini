@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <array>
 #include "graphics.hpp"
+#include "types.hpp"
 
 /// @brief The SpritesController class is responsible for storing the sprites that get drawn to the screen.
 class SpritesController {
@@ -42,7 +43,7 @@ class SpritesController {
          * @param y y coordinate [0,64)
          * @return uint8_t The total length of the drawn sprite [1,6] if sprite_id is valid, 0 otherwise
          */
-        uint8_t drawSprite(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y);
+        uint8_t drawSprite(const uint_fast8_t sprite_id, const uint_fast8_t x, const uint_fast8_t y);
 
         /**
          * @brief Draw tetromino block
@@ -51,10 +52,10 @@ class SpritesController {
          * 
          * @param x x coordinate [0,10]
          * @param y y coordinate [0,18]
-         * @param block_type which block to draw based on block enum ids [0,7] (7 means empty block)
+         * @param block_type which block to draw based on Tetromino_t enum ids
          * @return bool `true` if successfully drawn, `false` if block is OOB
          */
-        bool drawBlock(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type);
+        bool drawBlock(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type);
 
         /**
          * @brief Write text
@@ -67,7 +68,7 @@ class SpritesController {
          * @param sentence *null-terminated* string
          * @return uint8_t y position of the caret after writing text, allows for nested texts/numbers
          */
-        uint_fast8_t drawText(uint_fast8_t x, uint_fast8_t y, const char *sentence);
+        uint_fast8_t drawText(const uint_fast8_t x, const uint_fast8_t y, const char *sentence);
 
         /**
          * @brief Write number
@@ -81,7 +82,7 @@ class SpritesController {
          * @param base base to print the number at [2,62]
          * @return uint8_t y position of the caret after writing number, allows for nested texts/numbers
          */
-        uint_fast8_t drawNumber(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base);
+        uint_fast8_t drawNumber(const uint_fast8_t x, const uint_fast8_t y, const int32_t number, const uint_fast8_t base);
     private:
 
         GraphicsController *_graphics_controller;

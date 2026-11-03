@@ -1,6 +1,6 @@
 #include "melody.hpp"
 
-void MelodyController::playSong(uint8_t songId, bool loop)
+void MelodyController::playSong(const uint8_t songId, const bool loop)
 {
     currentSong = songId;
     currentSongMessage = 0;
