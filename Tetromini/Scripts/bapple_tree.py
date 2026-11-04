@@ -14,6 +14,7 @@
 # XOR masking before LZW instead of dupes : 1144KB
 #     zlib's deflate to XOR masked frames :  570KB
 #    zlib with blocks for frame integrity :  596KB
+#  zlib with blocks and framebuffer order :  539KB (HUH!)
 
 # aaaaaaaaaaaaaaaaaaaaaaaaaaaand that's why you don't reinvent the wheel.
 
@@ -21,7 +22,7 @@
 
 # so to read file, you read the header as follows:
 # first 8 bits tell you how many blocks we have, for B blocks
-# the next 32 * B bits are all 32-bit nums telling you the offset from bit 0 of the next block
+# the next 32 * B bits are all 32-bit nums telling you the size of the next block
 # so, with all blocks read until you reach the next block's bit or EOF
 
 from PIL import Image                        # for getting frames
@@ -33,7 +34,80 @@ import zlib
 
 bapple_bin_barray = BitArray()
 bapple_bin_barray_slice = BitArray()
-previous_frame_barray_content = BitArray(length=5504)
+previous_frame_barray_content = BitArray.from_zeros(8192)
+
+sizes = []
+num_blocks = 6516 // 36 # 181
+blocks_written = 0
+
+# go through each frame, dividing it into 36-frame z-libbed chunks
+for i in range(1, 6517):
+    print(f"\rProcessing frame {i} of 6516...                                                    ", end="", flush=True)
+    
+    # add leading zeroes to i
+    frame_id = "0000"[0:(4-len(str(i)))]+str(i)
+    
+    # store current frame's bit array
+    frame_barray = BitArray()
+    frame_barray_frame_content = BitArray()
+    with Image.open(f"bapple_frames/frame_{frame_id}.bmp") as im:
+        img_data = im.load()
+    
+        # storing it in the same way that framebuffers are stored
+        for outer_y in range(8):
+            for x in range(128):
+                if x < 21 or x >= 107:
+                    frame_barray_frame_content.append("0b00000000")
+                    continue
+                for inner_y in range(8, 0, -1):
+                    frame_barray_frame_content.append("0b1" if img_data[x - 21,(outer_y * 8) + inner_y - 1] > 0 else "0b0")
+                    
+        
+        # for y in range(64):
+        #     frame_barray_frame_content.append("0b000000000000000000000")
+        #     for x in range(86):
+        #         frame_barray_frame_content.append("0b1" if img_data[x,y] > 0 else "0b0")
+        #     frame_barray_frame_content.append("0b000000000000000000000")
+                
+    # add frame data xorred into previous frame
+    frame_barray.append(frame_barray_frame_content ^ previous_frame_barray_content)
+        
+    # add frame data to bapple.bin
+    bapple_bin_barray_slice.append(frame_barray)
+    previous_frame_barray_content = frame_barray_frame_content    
+    
+    if i % 36 == 0:
+        print(f"\rCompressing block {blocks_written + 1} of 181 with DEFLATE w/ zlibturbo friendly settings   ", end="", flush=True)
+        compressor = zlib.compressobj(level=9, method=zlib.DEFLATED, wbits=-12)
+        bapple_bin_str = bapple_bin_barray_slice.bytes
+        bapple_deflated_raw = compressor.compress(bapple_bin_str) + compressor.flush()
+        bapple_deflated = BitArray.from_bytes(bapple_deflated_raw)
+        assert(len(bapple_deflated)//8 <= 65535)
+        print(len(bapple_deflated)//8)
+        bapple_bin_barray.append(f'uintle:16={len(bapple_deflated)//8}') # add length
+        bapple_bin_barray.append(bapple_deflated)
+        blocks_written += 1
+        previous_frame_barray_content = BitArray.from_zeros(8192)
+        bapple_bin_barray_slice = BitArray()
+
+print(f"\rWriting headers                                                                             ", end="", flush=True)
+
+bapple_bin_barray.prepend(f'uint8={blocks_written}')
+
+print(f"\rSaving file! Total Size: {len(bapple_bin_barray)//8000}KB                                                                            ", end="", flush=True)
+
+# write bapple.bin!
+with open('bapple.bin', 'wb') as f:
+    bapple_bin_barray.tofile(f)
+
+# newline
+print()
+
+########################################################################
+
+# call me a hoarder but i translated this code so i kinda wanted to keep it here
+
+# nothing below here is used anymore
 
 # # LZW Encoding, tysm stack overflow and rosetta code :clap_emoji:
 # def lzw_compress(frame_bitstring):
@@ -87,54 +161,6 @@ previous_frame_barray_content = BitArray(length=5504)
 #         heappush(heap, [lo[0] + hi[0]] + lo[1:] + hi[1:])
 #     return sorted(heappop(heap)[1:], key = lambda p: (len(p[-1]), p))
 
-offsets = []
-num_blocks = 6516 // 36 # 181
-blocks_written = 0
-
-# go through each frame, dividing it into 36-frame z-libbed chunks
-for i in range(1, 6517):
-    print(f"\rProcessing frame {i} of 6516...                                                    ", end="", flush=True)
-    
-    # add leading zeroes to i
-    frame_id = "0000"[0:(4-len(str(i)))]+str(i)
-    
-    # store current frame's bit array
-    frame_barray = BitArray()
-    frame_barray_frame_content = BitArray()
-    with Image.open(f"bapple_frames/frame_{frame_id}.bmp") as im:
-        img_data = im.load()
-    
-        # this order improved LZW efficiency somehow. I STUMBLED UPON IT BY LUCK! insane
-        for x in range(86):
-            for y in range(64):
-                frame_barray_frame_content.append("0b1" if img_data[x,y] > 0 else "0b0")
-                
-    # add frame data xorred into previous frame
-    frame_barray.append(frame_barray_frame_content ^ previous_frame_barray_content)
-        
-    # add frame data to bapple.bin
-    bapple_bin_barray_slice.append(frame_barray)
-    previous_frame_barray_content = frame_barray_frame_content    
-    
-    if i % 36 == 0:
-        print(f"\rCompressing block {blocks_written + 1} of 181 with DEFLATE w/ zephyr friendly settings   ", end="", flush=True)
-        compressor = zlib.compressobj(level=9, method=zlib.DEFLATED, wbits=-12)
-        bapple_bin_str = bapple_bin_barray_slice.bytes
-        bapple_deflated_raw = compressor.compress(bapple_bin_str) + compressor.flush()
-        bapple_deflated = BitArray(bytes=bapple_deflated_raw)
-        offsets.append(len(bapple_bin_barray)+725) # 725 for uint8_t of # blocks and uint32_t of offsets
-        bapple_bin_barray.append(bapple_deflated)
-        blocks_written += 1
-        previous_frame_barray_content = BitArray(length=5504)
-        bapple_bin_barray_slice = BitArray()
-
-print(f"\rWriting headers                                                                             ", end="", flush=True)
-
-for i in range(181,0,-1):
-    bapple_bin_barray.prepend(f'uint32={offsets[i - 1]}')
-
-bapple_bin_barray.prepend(f'uint8={num_blocks}')
-
 # print(f"\rCompressing with LZW                           ", end="", flush=True)
 # bapple_bin_lzw = lzw_compress(bapple_bin_str)
 
@@ -173,12 +199,3 @@ bapple_bin_barray.prepend(f'uint8={num_blocks}')
 # for symbol in bapple_bin_lzw:
 #     code = bapple_bin_hufftree[symbol]
 #     bapple_bin_barray.append('0b' + code)
-
-print(f"\rSaving file!                                                                             ", end="", flush=True)
-
-# write bapple.bin!
-with open('bapple.bin', 'wb') as f:
-    bapple_bin_barray.tofile(f)
-
-# newline
-print()

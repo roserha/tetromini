@@ -69,7 +69,7 @@ class AudioController {
         }
 
     private:
-        static constexpr uint32_t kChannelNumber = 4;
+        static constexpr uint32_t kChannelNumber = 16;
         std::array<SoundChannel_t, kChannelNumber> Channels;
         uint16_t lastSample = 0; // <- to avoid snaps in between repeated notes
 

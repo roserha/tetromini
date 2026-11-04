@@ -7,6 +7,7 @@
 #include <array>         // Arrays
 
 #include "ssd1309.hpp"   // OLED Controller Driver
+#include "zlib_turbo.h"  // ZLib Turbo
 #include "spi.h"         // SSD1309 communicates via SPI 
 
 #include "adc.h"         // ADC for voltage monitoring 
@@ -19,6 +20,8 @@
 #include "playfield.hpp" // Playfield controller
 #include "audio.hpp"     // Audio controller
 #include "melody.hpp"    // Melody controller
+#include "decoder.hpp"   // Decoder controller
+#include "video.hpp"     // Video controller
 
 #include "types.hpp"
 
@@ -352,7 +355,7 @@ namespace {
 
         MelodyController melodyController;
 
-        melodyController.playSong(1, true);
+        melodyController.playSong(2, true);
 
         uint32_t receivedMsg = 0;
 
@@ -374,6 +377,85 @@ namespace {
                 uint32_t ulInterruptStatus = 0;
                 xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
             }
+        }
+    }
+
+
+    /////////////////////////////////////////////////////////////////////////
+    // Decoder Thread
+    /////////////////////////////////////////////////////////////////////////
+    
+    constexpr uint32_t    kDecoderStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
+    StackType_t           decoderStack[kDecoderStackWords];            // the task's own stack (32-bit words on Cortex-M)
+    StaticTask_t          decoderTcb;                                // FreeRTOS task control block for the task
+    constexpr UBaseType_t kDecoderPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+    TaskHandle_t          xDecoderTaskHandle = NULL;                 // Task handle for notifications
+    TaskHandle_t          xVideoTaskHandle = NULL;                 // Task handle for notifications
+
+    std::array<uint8_t, 36872> inflateBufferA; // Stores a block of 36 frames (86x64) + 8 bytes (per zlib turbo recommendation)
+    std::array<uint8_t, 36872> inflateBufferB; // Stores a block of 36 frames (86x64) + 8 bytes (per zlib turbo recommendation)
+    zlib_turbo zlibDecoder;
+
+    void decoderTask(void *)
+    {
+        DecoderController decoderController { &zlibDecoder, &inflateBufferA, &inflateBufferB };
+
+        decoderController.initializeDecoder(0);
+
+        uint32_t ulInterruptStatus = 0;
+
+        decoderController.decodeBlock();
+        xTaskNotify(xVideoTaskHandle, reinterpret_cast<uintptr_t>(decoderController.freshlyDecodedHalf()), eSetValueWithOverwrite);
+
+        for(;;)
+        {
+            decoderController.decodeBlock();
+            xTaskNotify(xVideoTaskHandle, reinterpret_cast<uintptr_t>(decoderController.freshlyDecodedHalf()), eSetValueWithOverwrite);
+            xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
+        }
+    }
+
+    /////////////////////////////////////////////////////////////////////////
+    // Video Thread
+    /////////////////////////////////////////////////////////////////////////
+    
+    constexpr uint32_t    kVideoStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
+    StackType_t           videoStack[kVideoStackWords];            // the task's own stack (32-bit words on Cortex-M)
+    StaticTask_t          videoTcb;                                // FreeRTOS task control block for the task
+    constexpr UBaseType_t kVideoPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+
+    void videoTask(void *)
+    {
+        VideoController videoController { &FrameBuffer, &xFrameBufferMutex };
+
+        uint32_t ulInterruptStatus = 0;
+
+        uint16_t videoFrame = 0;
+
+        const TickType_t xFrameTargetTimeOffset = pdMS_TO_TICKS(33);
+
+        for(;;)
+        {
+            xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
+
+            bool framesExist = true;
+            while (framesExist)
+            {
+                TickType_t xFrameStartTime = xTaskGetTickCount();
+                
+                framesExist = videoController.displayVideoFrame(reinterpret_cast<std::array<uint8_t, 36872> *>(ulInterruptStatus), videoFrame);
+                
+                videoFrame++;
+
+                // Send render command
+                Command_t renderCmd {CMD_BEGIN_RENDER, 0, nullptr};
+                xQueueSend(xRenderCommandQueue, (void *)&renderCmd, (TickType_t)10);
+
+                vTaskDelayUntil(&xFrameStartTime, xFrameTargetTimeOffset);
+            }
+
+            xTaskNotify(xDecoderTaskHandle, 0xF, eSetValueWithOverwrite);
+            videoFrame = 0;
         }
     }
 
@@ -424,12 +506,12 @@ namespace {
             xFrameStartTime = xTaskGetTickCount();
             TickType_t deltaTime = xFrameStartTime - xPreviousFrameTime;
 
-            // Clear framebuffer
-            if (xSemaphoreTake(xFrameBufferMutex, pdMS_TO_TICKS(16)))
-            {
-                oled.clear();
-                xSemaphoreGive(xFrameBufferMutex);
-            }
+            // // Clear framebuffer
+            // if (xSemaphoreTake(xFrameBufferMutex, pdMS_TO_TICKS(16)))
+            // {
+            //     oled.clear();
+            //     xSemaphoreGive(xFrameBufferMutex);
+            // }
 
             // Request battery level
             if (xSemaphoreTake(xBatteryInfoMutex, pdMS_TO_TICKS(1)))
@@ -524,7 +606,7 @@ namespace {
             }
 
             // Per-screen behaviours
-            switch (ScreenState)
+            switch (2)//(ScreenState)
             {
                 case SCREEN_MAINMENU:
                 {
@@ -560,15 +642,13 @@ namespace {
                 }
 
                 default:
-                    spritesController.drawText(121, 1, "ERROR SCREEN");
-                    spritesController.drawText(113, 1, ":(");
                     break;
             }
 
 
             // Send render command
-            Command_t renderCmd {CMD_BEGIN_RENDER, 0, nullptr};
-            xQueueSend(xRenderCommandQueue, (void *)&renderCmd, (TickType_t)10);
+            // Command_t renderCmd {CMD_BEGIN_RENDER, 0, nullptr};
+            // xQueueSend(xRenderCommandQueue, (void *)&renderCmd, (TickType_t)10);
 
             // Wait until 1 frame time in 60Hz
             vTaskDelayUntil(&xFrameStartTime, xFrameTargetTimeOffset);
@@ -654,7 +734,7 @@ extern "C" void app_init(void)
                                        nullptr, kAudioPriority,
                                        audioStack, &audioTcb);
     configASSERT(audio != nullptr);   // Confirm task was successfully created!
-    xAudioQueue = xQueueCreate(10, sizeof(Command_t));
+    xAudioQueue = xQueueCreate(32, sizeof(Command_t));
     configASSERT(xAudioQueue != nullptr);   // Confirm queue was successfully created!
     xAudioTaskHandle = audio;
 
@@ -663,6 +743,21 @@ extern "C" void app_init(void)
                                        nullptr, kMelodyPriority,
                                        melodyStack, &melodyTcb);
     configASSERT(melody != nullptr);   // Confirm task was successfully created!
+
+
+    // Launch decoder task
+    TaskHandle_t decoder = xTaskCreateStatic(decoderTask, "decoder", kDecoderStackWords,
+                                       nullptr, kDecoderPriority,
+                                       decoderStack, &decoderTcb);
+    configASSERT(decoder != nullptr);   // Confirm task was successfully created!
+    xDecoderTaskHandle = decoder;
+
+    // Launch video task
+    TaskHandle_t video = xTaskCreateStatic(videoTask, "video", kVideoStackWords,
+                                        nullptr, kVideoPriority,
+                                        videoStack, &videoTcb);
+    configASSERT(video != nullptr);
+    xVideoTaskHandle = video;
 
     // Launch game task
     TaskHandle_t game = xTaskCreateStatic(gameTask, "game", kGameStackWords,

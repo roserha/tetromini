@@ -68,6 +68,8 @@ sequenceDiagram
     participant ButtonISR as Button Interrupts
     participant Audio as Audio Thread
     participant Melody as Melody Thread
+    participant Video as Video Thread
+    participant Decoder as Decoder Thread
     participant MCU as STM32F405
 
     MCU->>App: Spawn Main Application inside FreeRTOS
@@ -88,7 +90,7 @@ sequenceDiagram
             Game->>Audio: Send any SFX to play, if appropriate
             Game->>App: Update framebuffer (mutexed)
             Game->>Render: Notify frame is ready to be rendered
-            Game->>Game: Sleep for ~16Ms
+            Game->>Game: Sleep for ~16ms
             Render->>MCU: Transmit updated framebuffer to SSD1309 via DMA (mutexed FB + waits on semaphored DMA state)
             Render->>Render: Sleep until transfer finished or timed out
             MCU->>Render: Notify transfer finished
@@ -103,6 +105,7 @@ sequenceDiagram
             Audio->>Audio: Prepare second half of next buffer based on channel info in 1.3ms
         end
     and Melody
+        App->>Melody: Tell Melody Controller to play song
         loop Per Song Command (or perpetually if song chose to be looped)
             Melody->>Melody: If song is looped, loop. Otherwise, sleep until notification to play a new song
             Melody->>Melody: Read stored melody info
@@ -121,6 +124,23 @@ sequenceDiagram
         loop Continuously
             ButtonISR->>Game: Send input to buffer upon rising or falling edge
         end
+    and Video
+      App->>Decoder: Tell Decoder Controller to start Video Playback
+      loop Per Video Command
+        par Decoding
+          Decoder->>Decoder: Get pointer to whichever block we are inflating
+          Decoder->>Decoder: Use ZLib Turbo to inflate current block
+          Decoder->>Video: Send inflated block to video when ready
+        and Playback
+          Video->>Video: Wait for decoded buffer
+          Video->>App: Update framebuffer with first frame (mutexed)
+          loop Per buffer until "EOF"
+            Video->>Video: Sleep for ~33ms
+            Video->>App: XOR Framebuffer with new i-frame
+          end
+          Video->>Decoder: Alert ready to receive new buffer
+        end
+      end
     end
 ```
 

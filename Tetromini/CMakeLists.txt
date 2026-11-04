@@ -78,12 +78,15 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     App/app.cpp
     App/Drivers/ssd1309.cpp
+    App/Drivers/zlib_turbo.cpp
     App/Controllers/graphics.cpp
     App/Controllers/sprites.cpp
     App/Controllers/tetromino.cpp
     App/Controllers/playfield.cpp
     App/Controllers/audio.cpp
     App/Controllers/melody.cpp
+    App/Controllers/video.cpp
+    App/Controllers/decoder.cpp
     ${CMAKE_CURRENT_BINARY_DIR}/bapple.o
 )
 

@@ -17,8 +17,9 @@ uint32_t MelodyController::getSongMessage()
 
     switch (currentSong)
     {
-        case 1:  msgToReturn = main_song[currentSongMessage++]; songLoopIndex = main_song.size(); break;        
-        default:                                                                                  break;
+        case 1:  msgToReturn = main_song[currentSongMessage++]; songLoopIndex = main_song.size();     break;        
+        case 2:  msgToReturn = bapple_song[currentSongMessage++]; songLoopIndex = bapple_song.size(); break;        
+        default:                                                                                      break;
     }
 
     if (currentSongMessage == songLoopIndex)
