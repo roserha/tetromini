@@ -265,7 +265,7 @@ Given that a singular second of stored audio would be 96KB given an audio playba
 
 Commands are arranged as follows: a 32-bit word arranged with masks as follows: `0x1F` for note (N), `0xE0` for octave (C), `0xFF00` for length (L), `0x7F0000` for volume (V), `0x7F800000` for waveId (W) for a final word `0b0WWW WWWW WVVV VVVV LLLL LLLL CCCN NNNN`. The most significant bit is restricted to indicate a wait time on stored songs, followed by a 31-bit integer indicating how many milliseconds to sleep before the next command.
 
-This made it such that, for example, the `main_song.mid` file, whose raw uncompressed wave would occupy **3.686MB** for a 38.4s playback, and MIDI file occupies *2.4KB*, takes up around *1.932KB* in RAM!
+This made it such that, for example, the `main_song.mid` file, whose raw uncompressed wave would occupy **3.686MB** for a 38.4s playback, and MIDI file occupies *2.4KB*, takes up around *1.932KB* in flash! It does depend on the arrangement, however, because a 20.5KB piano arrangement MIDI takes up ~25KB. It still beats its theoretical uncompressed size of ~20MB!
 
 ## Audio Synthesization
 

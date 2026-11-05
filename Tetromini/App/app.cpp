@@ -347,6 +347,7 @@ namespace {
     StackType_t           melodyStack[kMelodyStackWords];            // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          melodyTcb;                                // FreeRTOS task control block for the task
     constexpr UBaseType_t kMelodyPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+    TaskHandle_t          xMelodyTaskHandle = NULL;                 // Task handle for notifications
 
     void melodyTask(void *)
     {
@@ -355,27 +356,28 @@ namespace {
 
         MelodyController melodyController;
 
-        melodyController.playSong(2, true);
+        
 
-        uint32_t receivedMsg = 0;
+        uint32_t receivedSongMsg = 0;
+        uint32_t ulInterruptStatus = 0;
 
         for(;;)
         {
-            receivedMsg = melodyController.getSongMessage();
+            receivedSongMsg = melodyController.getSongMessage();
 
-            if ((receivedMsg & 0x80000000) == 0x80000000)
+            if ((receivedSongMsg & 0x80000000) == 0x80000000)
             {
-                const uint32_t msToSleep = receivedMsg ^ 0x80000000;
+                const uint32_t msToSleep = receivedSongMsg ^ 0x80000000;
                 vTaskDelay(pdMS_TO_TICKS(msToSleep));
-            } else if (receivedMsg != 0)
+            } else if (receivedSongMsg != 0)
             {
-                noteToPlay.cmdInfo = receivedMsg;
+                noteToPlay.cmdInfo = receivedSongMsg;
                 xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
             } else
             {
                 // Sleep until notified that we should wake up
-                uint32_t ulInterruptStatus = 0;
                 xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
+                melodyController.playSong(ulInterruptStatus, true);
             }
         }
     }
@@ -392,8 +394,8 @@ namespace {
     TaskHandle_t          xDecoderTaskHandle = NULL;                 // Task handle for notifications
     TaskHandle_t          xVideoTaskHandle = NULL;                 // Task handle for notifications
 
-    std::array<uint8_t, 36872> inflateBufferA; // Stores a block of 36 frames (86x64) + 8 bytes (per zlib turbo recommendation)
-    std::array<uint8_t, 36872> inflateBufferB; // Stores a block of 36 frames (86x64) + 8 bytes (per zlib turbo recommendation)
+    std::array<uint8_t, 36872> inflateBufferA{}; // Stores a block of 36 frames (86x64) + 8 bytes (per zlib turbo recommendation)
+    std::array<uint8_t, 36872> inflateBufferB{}; // Stores a block of 36 frames (86x64) + 8 bytes (per zlib turbo recommendation)
     zlib_turbo zlibDecoder;
 
     void decoderTask(void *)
@@ -404,14 +406,27 @@ namespace {
 
         uint32_t ulInterruptStatus = 0;
 
-        decoderController.decodeBlock();
-        xTaskNotify(xVideoTaskHandle, reinterpret_cast<uintptr_t>(decoderController.freshlyDecodedHalf()), eSetValueWithOverwrite);
+        // Decode a block straight ahead
+        decoderController.decodeBlock(true);
+
+        xTaskNotify(xVideoTaskHandle, 0x1, eSetValueWithOverwrite);
 
         for(;;)
         {
-            decoderController.decodeBlock();
-            xTaskNotify(xVideoTaskHandle, reinterpret_cast<uintptr_t>(decoderController.freshlyDecodedHalf()), eSetValueWithOverwrite);
             xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
+            switch (ulInterruptStatus)
+            {
+                case 0x1: // Video is checking buffer A
+                    decoderController.decodeBlock(false);
+                    break;
+
+                case 0x2: // Video is checking buffer B
+                    decoderController.decodeBlock(true);
+                    break;
+
+                default:
+                    break;
+            }
         }
     }
 
@@ -432,18 +447,28 @@ namespace {
 
         uint16_t videoFrame = 0;
 
-        const TickType_t xFrameTargetTimeOffset = pdMS_TO_TICKS(33);
+        const TickType_t xFrameTargetTimeOffset33 = pdMS_TO_TICKS(33);
+        const TickType_t xFrameTargetTimeOffset34 = pdMS_TO_TICKS(34);
+        uint8_t updateMod3 = 0;
+
+        std::array<uint8_t, 36872>* decodedBuffer = &inflateBufferA;
+
+        bool checkingBufferA = true;
+
+        // Wait until we have at least one block
+        xTaskNotifyWait(0x0, 0xFFFFFFFFUL, &ulInterruptStatus, portMAX_DELAY);
+        bool startedSong = false;
+
+        TickType_t xLastFrameTime = xTaskGetTickCount();
 
         for(;;)
         {
-            xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
+            xTaskNotify(xDecoderTaskHandle, checkingBufferA ? 0x1 : 0x2, eSetValueWithOverwrite);
 
             bool framesExist = true;
             while (framesExist)
             {
-                TickType_t xFrameStartTime = xTaskGetTickCount();
-                
-                framesExist = videoController.displayVideoFrame(reinterpret_cast<std::array<uint8_t, 36872> *>(ulInterruptStatus), videoFrame);
+                framesExist = videoController.displayVideoFrame(decodedBuffer, videoFrame);
                 
                 videoFrame++;
 
@@ -451,11 +476,26 @@ namespace {
                 Command_t renderCmd {CMD_BEGIN_RENDER, 0, nullptr};
                 xQueueSend(xRenderCommandQueue, (void *)&renderCmd, (TickType_t)10);
 
-                vTaskDelayUntil(&xFrameStartTime, xFrameTargetTimeOffset);
+                // This seeks to achieve exactly 30fps
+                if (updateMod3++ != 2)
+                    vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset33);
+                else {
+                    vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset34);
+                    updateMod3 = 0;
+                }
+                xLastFrameTime = xTaskGetTickCount();
             }
 
-            xTaskNotify(xDecoderTaskHandle, 0xF, eSetValueWithOverwrite);
+            // Swap buffers
+            decodedBuffer = checkingBufferA ? &inflateBufferB : &inflateBufferA;
+            checkingBufferA = !checkingBufferA;
             videoFrame = 0;
+
+            if (!startedSong)
+            {
+                xTaskNotify(xMelodyTaskHandle, 0x2, eSetValueWithOverwrite);
+                startedSong = true;
+            }
         }
     }
 
@@ -743,6 +783,7 @@ extern "C" void app_init(void)
                                        nullptr, kMelodyPriority,
                                        melodyStack, &melodyTcb);
     configASSERT(melody != nullptr);   // Confirm task was successfully created!
+    xMelodyTaskHandle = melody;
 
 
     // Launch decoder task

@@ -9,6 +9,7 @@ void DecoderController::initializeDecoder(const uint8_t fileId)
         case 0:
         default:
             fileStartPointer = &(_binary_bapple_bin_start[0]);
+            fileEndPointer = &(_binary_bapple_bin_end[0]);
     }
 
     currentPointer = fileStartPointer;
@@ -18,17 +19,23 @@ void DecoderController::initializeDecoder(const uint8_t fileId)
     
 }
 
-void DecoderController::decodeBlock()
+void DecoderController::decodeBlock(bool checkBufferA)
 {
-    //decoder.inflate()
-    _decoder->inflate_init(_inflateBuffer->data(), _inflateBuffer->size());
+    _inflateBuffer = checkBufferA ? _inflateBuffer_A : _inflateBuffer_B;
 
-    _decoder->inflate(currentPointer, blockSize);
-
-    inflateBufferPointsB = !inflateBufferPointsB;
-    _inflateBuffer = inflateBufferPointsB ? _inflateBuffer_B : _inflateBuffer_A;
-
-    currentPointer += blockSize;
-    std::memcpy(&blockSize, currentPointer, sizeof(blockSize));
-    currentPointer += 2;
+    if (fileStartPointer != nullptr)
+    {
+        _decoder->inflate_init(_inflateBuffer->data(), _inflateBuffer->size());
+    
+        _decoder->inflate(currentPointer, blockSize);
+    
+        currentPointer += blockSize;
+        std::memcpy(&blockSize, currentPointer, sizeof(blockSize));
+        currentPointer += 2;
+        if (currentPointer >= fileEndPointer)
+        {
+            fileStartPointer = nullptr;
+            fileEndPointer = nullptr;
+        }
+    }
 }

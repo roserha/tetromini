@@ -17,11 +17,7 @@ class DecoderController {
 
         void initializeDecoder(const uint8_t fileId);
         
-        void decodeBlock();
-
-        std::array<uint8_t, 36872> *freshlyDecodedHalf() {
-            return inflateBufferPointsB ? _inflateBuffer_A : _inflateBuffer_B;
-        }
+        void decodeBlock(bool checkBufferA);
 
     private:
         zlib_turbo *_decoder;
@@ -30,6 +26,7 @@ class DecoderController {
         std::array<uint8_t, 36872> *_inflateBuffer;
         bool inflateBufferPointsB = false;
         uint8_t const* fileStartPointer;
+        uint8_t const* fileEndPointer;
         uint8_t const* currentPointer;
         uint8_t currentIndex = 0;
         uint16_t blockSize = 0;

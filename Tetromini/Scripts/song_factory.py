@@ -21,20 +21,19 @@ def midi_to_array(src, basevol=28):
     ticks_per_beat = main_song_midi.ticks_per_beat
     song_array_with_times = []
     last_note_length = 0
+    
+    # these values are for curiosity
     unique_note_lengths = set()
     unique_wait_lengths = set()
+    
+    # we'll store the current time notes were turned on so we can keep track of simultaneous notes
+    notes_on = dict()
     for i, track in enumerate(main_song_midi.tracks):
         if not track.name.isnumeric():
             continue
         print(f"track {i} is instrument {track.name} and has {len(track)} messages")
         track_tempo = 500000
         
-        
-        playing_note = False
-        time_to_wait_before_note = 0
-        note_length = 0
-        note_note = 0
-        note_octave = 0
         current_time = 0
         note_volume = basevol if track.name != "2" else (basevol // 2)
         note_waveNumber = int(track.name)
@@ -45,27 +44,34 @@ def midi_to_array(src, basevol=28):
                 print(f"and tempo {track_tempo}")
                 
             delta_seconds = mido.tick2second(msg.time, ticks_per_beat, track_tempo)
-            delta_rounded = round(delta_seconds * 250) * 4
+            delta_rounded = round(delta_seconds * 250) * 4 # 4ms rounding
             current_time += delta_rounded
                 
             if msg.type == 'note_on':
-                playing_note = True
-                time_to_wait_before_note = round(mido.tick2second(msg.time, ticks_per_beat, track_tempo) * 250) * 4 # automatic 4ms rounding!!!
+                time_to_wait_before_note = delta_rounded
                 note_note = msg.note % 12
                 note_octave = (msg.note // 12) - 1
-                # current_time += time_to_wait_before_note
+                
                 # if we have to wait before the note, let's add a "phantom note" that plays for that long
                 if (time_to_wait_before_note != 0):
                     note_message = (note_note & 0x1f) | ((note_octave & 0x7) << 5) | ((time_to_wait_before_note & 0x7fc) << 6) | ((note_waveNumber & 0xff) << 23)
                     song_array_with_times.append((current_time - time_to_wait_before_note, note_message))
                     unique_wait_lengths.add((time_to_wait_before_note, ((time_to_wait_before_note & 0x7fc) << 6), ((0xFF00 & ((time_to_wait_before_note & 0x7fc) << 6)) >> 6)))
                 
+                notes_on[msg.note] = current_time
+                
             if msg.type == 'note_off':
-                note_length = round(mido.tick2second(msg.time, ticks_per_beat, track_tempo) * 250) * 4 # automatic 4ms rounding!!!
+                note_length = current_time - notes_on[msg.note]
                 if (note_length >= 2048):
-                    print("note too large at time", current_time / 1000, "seconds")
+                    print("note too large at time", current_time / 1000, "seconds:", note_length)
+                    assert(note_length < 2048)
+                if (note_length < 0):
+                    print("note length invalid at time", current_time / 1000, "seconds:", note_length)
                     assert(note_length < 2048)
                 # current_time += note_length
+                
+                note_note = msg.note % 12
+                note_octave = (msg.note // 12) - 1
                 
                 # add this note to the list of messages
                 if note_length > 0:
@@ -74,11 +80,6 @@ def midi_to_array(src, basevol=28):
                     unique_note_lengths.add((note_length, ((note_length & 0x7fc) << 6), ((0xFF00 & ((note_length & 0x7fc) << 6)) >> 6)))
                 
                 last_note_length = note_length
-                playing_note = False
-                time_to_wait_before_note = 0
-                note_length = 0
-                note_note = 0
-                note_octave = 0
                 
     # Now that we collected all the notes, let's sort them by time played. Since it's the first element of the tuple, it's pretty easy!
     song_array_with_times.sort()
