@@ -294,10 +294,10 @@ namespace {
                     uint16_t frequency = noteToFrequency[note] >> (8 - octave);
     
                     audioController.playWave(
-                        (0x7F800000 & noteInfo) >> 23,
+                        (0x78000000 & noteInfo) >> 27,
                         frequency,
-                        (0xFF00 & noteInfo) >> 6,
-                        (0x7F0000 & noteInfo) >> 16
+                        (0xFFF00 & noteInfo) >> 8,
+                        (0x7F00000 & noteInfo) >> 20
                     );
                 }
             }

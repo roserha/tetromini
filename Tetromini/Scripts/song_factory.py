@@ -35,7 +35,12 @@ def midi_to_array(src, basevol=28):
         track_tempo = 500000
         
         current_time = 0
-        note_volume = basevol if track.name != "2" else (basevol // 2)
+        note_volume = basevol 
+        if track.name == "2" or track.name == 4:
+            note_volume = basevol // 2
+        if track.name == "3":
+            note_volume = round(basevol * 1.5)
+            
         note_waveNumber = int(track.name)
         
         for msg in track:
@@ -44,7 +49,7 @@ def midi_to_array(src, basevol=28):
                 print(f"and tempo {track_tempo}")
                 
             delta_seconds = mido.tick2second(msg.time, ticks_per_beat, track_tempo)
-            delta_rounded = round(delta_seconds * 250) * 4 # 4ms rounding
+            delta_rounded = round(delta_seconds * 1000) # 1ms rounding
             current_time += delta_rounded
                 
             if msg.type == 'note_on':
@@ -53,21 +58,23 @@ def midi_to_array(src, basevol=28):
                 note_octave = (msg.note // 12) - 1
                 
                 # if we have to wait before the note, let's add a "phantom note" that plays for that long
-                if (time_to_wait_before_note != 0):
-                    note_message = (note_note & 0x1f) | ((note_octave & 0x7) << 5) | ((time_to_wait_before_note & 0x7fc) << 6) | ((note_waveNumber & 0xff) << 23)
-                    song_array_with_times.append((current_time - time_to_wait_before_note, note_message))
-                    unique_wait_lengths.add((time_to_wait_before_note, ((time_to_wait_before_note & 0x7fc) << 6), ((0xFF00 & ((time_to_wait_before_note & 0x7fc) << 6)) >> 6)))
+                while (time_to_wait_before_note != 0):
+                    phantom_note_duration = min(time_to_wait_before_note, 1020)
+                    note_message = (note_note & 0x1f) | ((note_octave & 0x7) << 5) | ((phantom_note_duration & 0xfff) << 8) | ((note_waveNumber & 0xf) << 27)
+                    song_array_with_times.append((current_time - phantom_note_duration, note_message))
+                    unique_wait_lengths.add((phantom_note_duration, ((phantom_note_duration & 0xfff) << 8), ((0xFFF00 & ((phantom_note_duration & 0xfff) << 8)) >> 8)))
+                    time_to_wait_before_note -= phantom_note_duration
                 
                 notes_on[msg.note] = current_time
                 
             if msg.type == 'note_off':
                 note_length = current_time - notes_on[msg.note]
-                if (note_length >= 2048):
+                if (note_length >= 4096):
                     print("note too large at time", current_time / 1000, "seconds:", note_length)
-                    assert(note_length < 2048)
+                    assert(note_length < 4096)
                 if (note_length < 0):
                     print("note length invalid at time", current_time / 1000, "seconds:", note_length)
-                    assert(note_length < 2048)
+                    assert(note_length >= 0)
                 # current_time += note_length
                 
                 note_note = msg.note % 12
@@ -75,9 +82,9 @@ def midi_to_array(src, basevol=28):
                 
                 # add this note to the list of messages
                 if note_length > 0:
-                    note_message = (note_note & 0x1f) | ((note_octave & 0x7) << 5) | ((note_length & 0x7fc) << 6) | ((note_volume & 0x7f) << 16) | ((note_waveNumber & 0xff) << 23)
+                    note_message = (note_note & 0x1f) | ((note_octave & 0x7) << 5) | ((note_length & 0xfff) << 8) | ((note_volume & 0x7f) << 20) | ((note_waveNumber & 0xf) << 27)
                     song_array_with_times.append((current_time - note_length, note_message))
-                    unique_note_lengths.add((note_length, ((note_length & 0x7fc) << 6), ((0xFF00 & ((note_length & 0x7fc) << 6)) >> 6)))
+                    unique_note_lengths.add((note_length, ((note_length & 0xfff) << 8), ((0xFF00 & ((note_length & 0xfff) << 8)) >> 8)))
                 
                 last_note_length = note_length
                 
@@ -117,7 +124,7 @@ def midi_to_array(src, basevol=28):
     return song_code
 
 songs = midi_to_array("main_song.mid")
-songs += midi_to_array("bapple_song.mid", 10)
+songs += midi_to_array("bapple_song.mid", 20)
 
 with open(path, "w", encoding="utf-8") as file:
     file.write(original_contents[0])
