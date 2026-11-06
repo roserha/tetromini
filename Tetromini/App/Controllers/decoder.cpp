@@ -6,10 +6,14 @@ void DecoderController::initializeDecoder(const uint8_t fileId)
 
     switch (fileId)
     {
-        case 0:
-        default:
+        case 1:
             fileStartPointer = &(_binary_bapple_bin_start[0]);
             fileEndPointer = &(_binary_bapple_bin_end[0]);
+
+        case 0:
+        default:
+            fileStartPointer = &(_binary_mainmenu_bin_start[0]);
+            fileEndPointer = &(_binary_mainmenu_bin_end[0]);
     }
 
     currentPointer = fileStartPointer;

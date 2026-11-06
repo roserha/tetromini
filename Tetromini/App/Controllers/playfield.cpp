@@ -273,6 +273,8 @@ void PlayfieldController::updatePhantomPiecePosition()
 
 void PlayfieldController::initializePlayfield()
 {
+    // Set playfield to be empty
+    Playfield.fill(0);
     // Initialize us at a random state of seen pieces
     uint64_t rand = (3739 * stopwatch + *_salt);
     seen_pieces = rand & 0b1111111;

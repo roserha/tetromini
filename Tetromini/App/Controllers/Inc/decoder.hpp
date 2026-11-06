@@ -9,6 +9,7 @@
 #include "semphr.h"     // Mutexes!
 
 extern "C" const uint8_t _binary_bapple_bin_start[], _binary_bapple_bin_end[];
+extern "C" const uint8_t _binary_mainmenu_bin_start[], _binary_mainmenu_bin_end[];
 
 class DecoderController {
     public:

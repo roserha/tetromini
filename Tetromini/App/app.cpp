@@ -35,6 +35,9 @@ namespace {
     SemaphoreHandle_t xFrameBufferMutex = NULL;
     StaticSemaphore_t xFrameBufferMutexBuffer;
 
+    SemaphoreHandle_t xDisplayControlMutex = NULL;
+    StaticSemaphore_t xDisplayControlMutexBuffer;
+
     SSD1309Driver oled { &hspi1, &FrameBuffer,
                             { OLED_CS_GPIO_Port,    OLED_CS_Pin },
                             { OLED_DC_GPIO_Port,    OLED_DC_Pin },
@@ -44,33 +47,24 @@ namespace {
     StackType_t           renderStack[kRenderStackWords];           // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          renderTcb;                                // FreeRTOS task control block for the task
     constexpr UBaseType_t kRenderPriority = tskIDLE_PRIORITY + 2;   // 2 levels above idle (higher = more important)
-    QueueHandle_t xRenderCommandQueue = NULL;
+    TaskHandle_t          xRenderTaskHandle = NULL;                 // Task handle for notifications
 
     void renderTask(void*)
     {
         const bool oledInitOk = oled.init();
         configASSERT(oledInitOk);
 
-        Command_t xReceivedCmd;
-
         for (;;) {
-            
+            uint32_t ulInterruptValue = 0;
+            xTaskNotifyWait(0x0, 0xFFFFFFFFUL, &ulInterruptValue, portMAX_DELAY);
             // Wait for render commands
-            if (xQueueReceive(xRenderCommandQueue, &xReceivedCmd, portMAX_DELAY) == pdTRUE)
+            if (ulInterruptValue == CMD_BEGIN_RENDER)
             {
-                switch (xReceivedCmd.cmdType)
+                if (xSemaphoreTake(xFrameBufferMutex, 0))
                 {
-                    case CMD_BEGIN_RENDER:
-                        if (xSemaphoreTake(xFrameBufferMutex, pdMS_TO_TICKS(16)))
-                        {
-                            bool result = oled.flush();
-                            xSemaphoreGive(xFrameBufferMutex);
-                            configASSERT(result);
-                        }
-                        break;
-
-                    default:
-                        break;
+                    bool result = oled.flush();
+                    xSemaphoreGive(xFrameBufferMutex);
+                    configASSERT(result);
                 }
             }
         }
@@ -442,6 +436,8 @@ namespace {
     void videoTask(void *)
     {
         VideoController videoController { &FrameBuffer, &xFrameBufferMutex };
+        GraphicsController graphicsController {&FrameBuffer, &xFrameBufferMutex};
+        SpritesController spritesController {&graphicsController};
 
         uint32_t ulInterruptStatus = 0;
 
@@ -459,42 +455,90 @@ namespace {
         xTaskNotifyWait(0x0, 0xFFFFFFFFUL, &ulInterruptStatus, portMAX_DELAY);
         bool startedSong = false;
 
+        // Store battery info locally (to avoid not being able to access to it in case BatteryLvlTask is occupied)
+        BatteryInfo_t batteryInfo_videoTask = {0, 0};
+
         TickType_t xLastFrameTime = xTaskGetTickCount();
+        bool weHaveMutex = false;
+
+        bool showMenuText = true;
 
         for(;;)
         {
-            xTaskNotify(xDecoderTaskHandle, checkingBufferA ? 0x1 : 0x2, eSetValueWithOverwrite);
-
-            bool framesExist = true;
-            while (framesExist)
+            if(weHaveMutex)
             {
-                framesExist = videoController.displayVideoFrame(decodedBuffer, videoFrame);
+                xTaskNotify(xDecoderTaskHandle, checkingBufferA ? 0x1 : 0x2, eSetValueWithOverwrite);
                 
-                videoFrame++;
+                bool framesExist = true;
+                while (framesExist)
+                {
+                    // Insert video frame
+                    framesExist = videoController.displayVideoFrame(decodedBuffer, videoFrame);
+                    
+                    videoFrame++;
 
-                // Send render command
-                Command_t renderCmd {CMD_BEGIN_RENDER, 0, nullptr};
-                xQueueSend(xRenderCommandQueue, (void *)&renderCmd, (TickType_t)10);
+                    // Show menu text if wanted
+                    if (showMenuText)
+                    {
+                        // Request battery level
+                        if (xSemaphoreTake(xBatteryInfoMutex, pdMS_TO_TICKS(1)))
+                        {
+                            batteryInfo_videoTask = batteryInfo;
 
-                // This seeks to achieve exactly 30fps
-                if (updateMod3++ != 2)
+                            xSemaphoreGive(xBatteryInfoMutex);
+                        }
+                        spritesController.drawNumber(108,
+                            spritesController.drawText(108,1, "Voltage:"), 
+                        batteryInfo_videoTask.voltage, 10);
+            
+                        spritesController.drawText(90,
+                            spritesController.drawNumber(90,
+                                spritesController.drawText(90,1, "Level:"), 
+                            batteryInfo_videoTask.percentage, 10),
+                            "%"
+                        );
+                    }
+                    
+                    // Send render command
+                    xTaskNotify(xRenderTaskHandle, CMD_BEGIN_RENDER, eSetValueWithOverwrite);
+                    
+                    // This seeks to achieve exactly 30fps
+                    if (updateMod3++ != 2)
                     vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset33);
-                else {
-                    vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset34);
-                    updateMod3 = 0;
+                    else {
+                        vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset34);
+                        updateMod3 = 0;
+                    }
+                    xLastFrameTime = xTaskGetTickCount();
+
+                    if (xTaskNotifyWait(0x0, 0xFFFFFFFFUL, &ulInterruptStatus, 0) == pdPASS)
+                    {
+                        if (ulInterruptStatus == CMD_SWITCH_DISPLAY_OWNERSHIP)
+                        {
+                            xSemaphoreGive(xDisplayControlMutex);
+                            weHaveMutex = false;
+                            vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset33);
+                            break;
+                        }
+                    }
                 }
-                xLastFrameTime = xTaskGetTickCount();
-            }
+                
+                // Swap buffers
+                decodedBuffer = checkingBufferA ? &inflateBufferB : &inflateBufferA;
+                checkingBufferA = !checkingBufferA;
+                videoFrame = 0;
+                
+                // if (!startedSong)
+                // {
+                //     xTaskNotify(xMelodyTaskHandle, 0x2, eSetValueWithOverwrite);
+                //     startedSong = true;
+                // }
 
-            // Swap buffers
-            decodedBuffer = checkingBufferA ? &inflateBufferB : &inflateBufferA;
-            checkingBufferA = !checkingBufferA;
-            videoFrame = 0;
 
-            if (!startedSong)
+            } else
             {
-                xTaskNotify(xMelodyTaskHandle, 0x2, eSetValueWithOverwrite);
-                startedSong = true;
+                xSemaphoreTake(xDisplayControlMutex, portMAX_DELAY);
+                weHaveMutex = true;
             }
         }
     }
@@ -535,31 +579,21 @@ namespace {
         // Get initial start time and set target time
         TickType_t xFrameStartTime = 0;
         TickType_t xPreviousFrameTime = 0;
-        const TickType_t xFrameTargetTimeOffset = pdMS_TO_TICKS(16);
+        const TickType_t xFrameTargetTimeOffset33 = pdMS_TO_TICKS(33);
+        const TickType_t xFrameTargetTimeOffset34 = pdMS_TO_TICKS(34);
+        uint8_t updateMod3 = 0;
 
-        // Store battery info locally (to avoid not being able to access to it in case BatteryLvlTask is occupied)
-        BatteryInfo_t batteryInfo_gameTask = {0, 0};
+        bool weHaveDisplayControl = false;
+
+        xTaskNotify(xMelodyTaskHandle, 0x1, eSetValueWithOverwrite);
 
         for (;;) {
             // Delta time calculations
             xPreviousFrameTime = xFrameStartTime;
             xFrameStartTime = xTaskGetTickCount();
             TickType_t deltaTime = xFrameStartTime - xPreviousFrameTime;
+            
 
-            // // Clear framebuffer
-            // if (xSemaphoreTake(xFrameBufferMutex, pdMS_TO_TICKS(16)))
-            // {
-            //     oled.clear();
-            //     xSemaphoreGive(xFrameBufferMutex);
-            // }
-
-            // Request battery level
-            if (xSemaphoreTake(xBatteryInfoMutex, pdMS_TO_TICKS(1)))
-            {
-                batteryInfo_gameTask = batteryInfo;
-
-                xSemaphoreGive(xBatteryInfoMutex);
-            }
 
             // Process input messages
             Command_t xReceivedCmd;
@@ -580,6 +614,14 @@ namespace {
                                 case CMD_START_BTN:   {
                                     ScreenState = SCREEN_GAME; 
                                     playfieldController.initializePlayfield();  
+                                    while (!weHaveDisplayControl)
+                                    {
+                                        xTaskNotify(xVideoTaskHandle, CMD_SWITCH_DISPLAY_OWNERSHIP, eSetValueWithOverwrite);
+                                        if (xSemaphoreTake(xDisplayControlMutex, pdMS_TO_TICKS(1)) == pdTRUE)
+                                        {
+                                            weHaveDisplayControl = true;
+                                        }
+                                    }
                                 } break;
                                 case CMD_ROT_CCW_BTN: {
                                     Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 0, 5, 64, 250), nullptr};
@@ -628,6 +670,15 @@ namespace {
                                 case CMD_ROT_CW_BTN:  playfieldController.rotateCurrentPiece(true);  break;
                                 case CMD_DOWN_BTN:    playfieldController.setSoftDropStatus(true);   break;
                                 case CMD_UP_BTN:      playfieldController.hardDropCurrentPiece();    break;
+                                case CMD_POWER_BTN:
+                                    if (weHaveDisplayControl)
+                                    {
+                                        weHaveDisplayControl = false;
+                                        xSemaphoreGive(xDisplayControlMutex);
+                                        vTaskDelay(pdMS_TO_TICKS(1));
+                                        ScreenState = SCREEN_MAINMENU;
+                                        break;
+                                    }
                                 default:                                                             break;
                             }
                         }
@@ -646,38 +697,28 @@ namespace {
             }
 
             // Per-screen behaviours
-            switch (2)//(ScreenState)
+            switch (ScreenState)
             {
                 case SCREEN_MAINMENU:
                 {
-                    spritesController.drawText(121, 1, "TETROMINI");
-                    spritesController.drawText(113, 1, "(STM Edition)");
-                    spritesController.drawText(97, 1, "Press START");
-                    spritesController.drawText(89, 1, "to play");
-        
-                    spritesController.drawNumber(70,
-                        spritesController.drawText(70,1, "Voltage:"), 
-                    batteryInfo_gameTask.voltage, 10);
-        
-                    spritesController.drawText(62,
-                        spritesController.drawNumber(62,
-                            spritesController.drawText(62,1, "Level:"), 
-                        batteryInfo_gameTask.percentage, 10),
-                        "%"
-                    );
-        
-                    // Spinny tetromino
-                    Tetromino_t tetrominoType = Tetromino_t(1 + ((xFrameStartTime/1000) % 7));
-                    Spin_t spinType = Spin_t(((xFrameStartTime/250) % 4)) ;
-                    tetrominoController.drawTetromino(4,4,tetrominoType,spinType);
+
                     break;
                 }
 
                 case SCREEN_GAME:
                 {
                     playfieldController.tickPlayfield(deltaTime, xFrameStartTime);
-                    playfieldController.renderPlayfield();
-                    playfieldController.renderPlayfieldHeader();
+                    if (weHaveDisplayControl)
+                    {   
+                        // Clear framebuffer
+                        if (xSemaphoreTake(xFrameBufferMutex, pdMS_TO_TICKS(16)))
+                        {
+                            oled.clear();
+                            xSemaphoreGive(xFrameBufferMutex);
+                        }
+                        playfieldController.renderPlayfield();
+                        playfieldController.renderPlayfieldHeader();
+                    }
                     break;
                 }
 
@@ -687,11 +728,18 @@ namespace {
 
 
             // Send render command
-            // Command_t renderCmd {CMD_BEGIN_RENDER, 0, nullptr};
-            // xQueueSend(xRenderCommandQueue, (void *)&renderCmd, (TickType_t)10);
+            if (weHaveDisplayControl)
+            {
+                xTaskNotify(xRenderTaskHandle, CMD_BEGIN_RENDER, eSetValueWithOverwrite);
+            }
 
-            // Wait until 1 frame time in 60Hz
-            vTaskDelayUntil(&xFrameStartTime, xFrameTargetTimeOffset);
+            // This seeks to achieve exactly 30fps
+            if (updateMod3++ != 2)
+            vTaskDelayUntil(&xFrameStartTime, xFrameTargetTimeOffset33);
+            else {
+                vTaskDelayUntil(&xFrameStartTime, xFrameTargetTimeOffset34);
+                updateMod3 = 0;
+            }
         }
     }
     
@@ -746,8 +794,9 @@ namespace {
 
 extern "C" void app_init(void)
 {
-    // Initialize display mutex
+    // Initialize display mutexes
     xFrameBufferMutex = xSemaphoreCreateMutexStatic(&xFrameBufferMutexBuffer);
+    xDisplayControlMutex = xSemaphoreCreateMutexStatic(&xDisplayControlMutexBuffer);
 
     // Initialize battery adc mutex
     xBatteryAdcMutex = xSemaphoreCreateMutexStatic(&xBatteryAdcMutexBuffer);
@@ -760,8 +809,7 @@ extern "C" void app_init(void)
                                        nullptr, kRenderPriority,
                                        renderStack, &renderTcb);
     configASSERT(render != nullptr);   // Confirm task was successfully created!
-    xRenderCommandQueue = xQueueCreate(10, sizeof(Command_t));
-    configASSERT(xRenderCommandQueue != nullptr);   // Confirm queue was successfully created!
+    xRenderTaskHandle = render;
 
     // Launch battery task
     TaskHandle_t battery = xTaskCreateStatic(batteryLvlTask, "battery", kBatteryLvlStackWords,

@@ -2,7 +2,7 @@
 build/
 
 # bapple frames
-bapple_frames/
+*_frames/
 
 # KiCad stuff
 .history/

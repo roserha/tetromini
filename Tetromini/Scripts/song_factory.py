@@ -37,9 +37,7 @@ def midi_to_array(src, basevol=28):
         current_time = 0
         note_volume = basevol 
         if track.name == "2" or track.name == 4:
-            note_volume = basevol // 2
-        if track.name == "3":
-            note_volume = round(basevol * 1.5)
+            note_volume = int(basevol // 1.5)
             
         note_waveNumber = int(track.name)
         
