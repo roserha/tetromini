@@ -660,6 +660,12 @@ namespace {
                 if (salt >= 2147457158)
                     salt -= 2147457158;
 
+                // Ignore any presses in the first 100ms
+                if (xFrameStartTime < pdMS_TO_TICKS(100))
+                {
+                    continue;
+                }
+
                 switch (ScreenState)
                 {
                     case SCREEN_GAME:
