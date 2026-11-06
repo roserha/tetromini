@@ -128,6 +128,17 @@ class PlayfieldController {
         void initializePlayfield();
 
         /**
+         * @brief Flip current game pause state
+         */
+        void flipPaused() { gameIsPaused = !gameIsPaused; }
+
+        /**
+         * @brief Get current game pause state
+         * @return bool true if game is paused, false otherwise
+         */
+        bool getPaused() { return gameIsPaused; }
+
+        /**
          * @brief Update current playfield status
          * 
          * Compute every single logistic about the current state
@@ -239,4 +250,7 @@ class PlayfieldController {
 
         // AudioQueue for SFX
         QueueHandle_t _audioQueue;
+
+        // Keep track if gameplay is paused
+        bool gameIsPaused = false;
 };

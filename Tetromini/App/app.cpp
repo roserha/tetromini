@@ -592,14 +592,6 @@ namespace {
                 decodedBuffer = checkingBufferA ? &inflateBufferB : &inflateBufferA;
                 checkingBufferA = !checkingBufferA;
                 videoBlockFrame = 0;
-                
-                // if (!startedSong)
-                // {
-                //     xTaskNotify(xMelodyTaskHandle, 0x2, eSetValueWithOverwrite);
-                //     startedSong = true;
-                // }
-
-
             } else
             {
                 xSemaphoreTake(xDisplayControlMutex, portMAX_DELAY);
@@ -656,10 +648,12 @@ namespace {
             xFrameStartTime = xTaskGetTickCount();
             TickType_t deltaTime = xFrameStartTime - xPreviousFrameTime;
             
-
+            // Get paused state
+            bool isGamePaused = playfieldController.getPaused();
 
             // Process input messages
             Command_t xReceivedCmd;
+            Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, 0, nullptr};
             while (xQueueReceive(xGameInputQueue, &xReceivedCmd, pdMS_TO_TICKS(1)) == pdTRUE)
             {
                 salt += 26489;
@@ -668,60 +662,6 @@ namespace {
 
                 switch (ScreenState)
                 {
-                    case SCREEN_MAINMENU:
-                        if (xReceivedCmd.cmdInfo == 0) // Releasing
-                        {
-                            switch (xReceivedCmd.cmdType)
-                            {
-                                // Open game when releasing pause
-                                case CMD_START_BTN:   {
-                                    ScreenState = SCREEN_GAME; 
-                                    xTaskNotify(xMelodyTaskHandle, 0x1, eSetValueWithOverwrite);
-                                    playfieldController.initializePlayfield();  
-                                    while (!weHaveDisplayControl)
-                                    {
-                                        xTaskNotify(xVideoTaskHandle, CMD_SWITCH_DISPLAY_OWNERSHIP, eSetValueWithOverwrite);
-                                        if (xSemaphoreTake(xDisplayControlMutex, pdMS_TO_TICKS(1)) == pdTRUE)
-                                        {
-                                            weHaveDisplayControl = true;
-                                        }
-                                    }
-                                } break;
-                                case CMD_ROT_CCW_BTN: {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 0, 5, 64, 250), nullptr};
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    
-                                } break;
-                                case CMD_ROT_CW_BTN:  {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 2, 5, 64, 250), nullptr};
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    
-                                } break;
-                                case CMD_UP_BTN:      {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 4, 5, 64, 250), nullptr};
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    
-                                } break;
-                                case CMD_DOWN_BTN:    {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 5, 5, 64, 250), nullptr};
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    
-                                } break;
-                                case CMD_LEFT_BTN:    {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 7, 5, 64, 250), nullptr};
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    
-                                } break;
-                                case CMD_RIGHT_BTN:   {
-                                    Command_t noteToPlay = {CMD_AUDIO_PLAY_SOUND, AudioController::sampleToUlValue(1, 9, 5, 64, 250), nullptr};
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    
-                                } break;
-                                default:                                                                        break;
-                            }
-                            break;
-                        }
-
                     case SCREEN_GAME:
                     {
                         if (xReceivedCmd.cmdInfo == 1) // Pressing
@@ -734,6 +674,28 @@ namespace {
                                 case CMD_ROT_CW_BTN:  playfieldController.rotateCurrentPiece(true);  break;
                                 case CMD_DOWN_BTN:    playfieldController.setSoftDropStatus(true);   break;
                                 case CMD_UP_BTN:      playfieldController.hardDropCurrentPiece();    break;
+                                case CMD_START_BTN:
+                                    playfieldController.flipPaused();
+                                    isGamePaused = playfieldController.getPaused();
+                                    if (isGamePaused)
+                                    {
+                                        xTaskNotify(xMelodyTaskHandle, 0x80000001, eSetValueWithOverwrite);
+                                        noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 0, 6, 20, 128);
+                                        xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                        vTaskDelay(pdMS_TO_TICKS(128));
+                                        noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 3, 6, 20, 128);
+                                        xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    }
+                                    else
+                                    {
+                                        xTaskNotify(xMelodyTaskHandle, 0x80000002, eSetValueWithOverwrite);
+                                        noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 3, 6, 20, 128);
+                                        xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                        vTaskDelay(pdMS_TO_TICKS(128));
+                                        noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 0, 6, 20, 128);
+                                        xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    }
+                                    break;
                                 case CMD_POWER_BTN:
                                     if (weHaveDisplayControl)
                                     {
@@ -757,6 +719,54 @@ namespace {
                         }
                     } break;
 
+                    case SCREEN_MAINMENU:
+                        if (xReceivedCmd.cmdInfo == 0) // Releasing
+                        {
+                            switch (xReceivedCmd.cmdType)
+                            {
+                                // Open game when releasing pause
+                                case CMD_START_BTN:   {
+                                    ScreenState = SCREEN_GAME; 
+                                    xTaskNotify(xMelodyTaskHandle, 0x1, eSetValueWithOverwrite);
+                                    playfieldController.initializePlayfield();  
+                                    while (!weHaveDisplayControl)
+                                    {
+                                        xTaskNotify(xVideoTaskHandle, CMD_SWITCH_DISPLAY_OWNERSHIP, eSetValueWithOverwrite);
+                                        if (xSemaphoreTake(xDisplayControlMutex, pdMS_TO_TICKS(1)) == pdTRUE)
+                                        {
+                                            weHaveDisplayControl = true;
+                                        }
+                                    }
+                                } break;
+                                case CMD_ROT_CCW_BTN: 
+                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 0, 6, 20, 250);
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_ROT_CW_BTN:  
+                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 2, 6, 20, 250);
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_UP_BTN:      
+                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 4, 6, 20, 250);
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_DOWN_BTN:    
+                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 5, 6, 20, 250);
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_LEFT_BTN:    
+                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 7, 6, 20, 250);
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_RIGHT_BTN:   
+                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 9, 6, 20, 250);
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                default: break;
+                            }
+                            break;
+                        }
+
                     default: break;
                 }
             }
@@ -764,12 +774,6 @@ namespace {
             // Per-screen behaviours
             switch (ScreenState)
             {
-                case SCREEN_MAINMENU:
-                {
-
-                    break;
-                }
-
                 case SCREEN_GAME:
                 {
                     playfieldController.tickPlayfield(deltaTime, xFrameStartTime);

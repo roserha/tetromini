@@ -32,6 +32,20 @@ void PlayfieldController::renderPlayfield()
 
     // Draw current tetromino
     _tetrominoController->drawTetromino(pieceXPos, pieceYPos - 1, currentPiece, currentSpinState);
+
+    // Draw pased logo if paused
+    if (gameIsPaused)
+    {
+        // Draw pause bars
+        if ((stopwatch & 0x7FF) < 1024)
+        {
+            _graphicsController->filledRect(30,6,68,20, false);
+            _graphicsController->filledRect(32,8,64,16, true);
+
+            _graphicsController->filledRect(30,38,68,20, false);
+            _graphicsController->filledRect(32,40,64,16, true);
+        }
+    }
 }
 
 void PlayfieldController::renderPlayfieldHeader()
@@ -138,6 +152,9 @@ bool PlayfieldController::checkForCollision(const Tetromino_t block_type, const 
 
 void PlayfieldController::rotateCurrentPiece(const bool clockwise)
 {
+    if (gameIsPaused)
+        return;
+
     Spin_t desiredSpinState = currentSpinState;
 
     switch (currentSpinState)
@@ -195,6 +212,9 @@ void PlayfieldController::rotateCurrentPiece(const bool clockwise)
 
 void PlayfieldController::moveCurrentPiece(const bool right)
 {
+    if (gameIsPaused)
+        return;
+
     bool willItCollide = checkForCollision(currentPiece, currentSpinState, pieceXPos + (right ? 1 : -1), pieceYPos);
     if (!willItCollide)
     {
@@ -241,6 +261,9 @@ void PlayfieldController::softDropCurrentPiece()
 
 void PlayfieldController::hardDropCurrentPiece()
 {
+    if (gameIsPaused)
+        return;
+
     pieceYPos = phantomYPos;
     finishDroppingPiece();
 }
@@ -277,13 +300,16 @@ void PlayfieldController::initializePlayfield()
     pieceXPos = 4;
     pieceYPos = 20;
     updatePhantomPiecePosition();
+
+    gameIsPaused = false;
 }
 
 void PlayfieldController::tickPlayfield(const uint32_t delta_time, const uint32_t elapsed_time)
 {
-    // Skip first frame
-    if (elapsed_time == 0)
+    // Skip first frame or if game is paused
+    if (elapsed_time == 0 || gameIsPaused)
     {
+        stopwatch = elapsed_time;
         return;
     }
 
