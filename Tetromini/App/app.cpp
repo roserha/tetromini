@@ -107,8 +107,21 @@ namespace {
 
             uint_fast8_t successfulReadings = 0;
 
+            BatteryInfo_t oldInfo {0, 0};
+
+            // Retrieve old info
+            if (xSemaphoreTake(xBatteryInfoMutex, pdMS_TO_TICKS(16)))
+            {
+                oldInfo = batteryInfo;
+
+                xSemaphoreGive(xBatteryInfoMutex);
+            }
+
             // Attempt 10 readings from ADC
-            for (uint_fast8_t i = 0; successfulReadings < 10 && i < 20; i++)
+            // (but only if we don't already have a reading)
+            uint8_t readAttempts = oldInfo.voltage > 0 ? 10 : 1;
+            uint16_t sleepTime = oldInfo.voltage > 0 ? 750 : 10;
+            for (uint_fast8_t i = 0; successfulReadings < readAttempts && i < 20; i++)
             {
                 uint32_t temporaryVoltage = 0;
 
@@ -133,7 +146,7 @@ namespace {
                     readVoltage += temporaryVoltage;
                 }
 
-                vTaskDelay(pdMS_TO_TICKS(750));
+                vTaskDelay(pdMS_TO_TICKS(sleepTime));
             }
 
             // ONLY PROCEED IF WE HAVE HAD A SUCCESSFUL READING!
@@ -183,16 +196,6 @@ namespace {
                     int64_t distance = (computedVoltage - lower_bound) * 10;
     
                     computedPercentage = lower_bound_idx * 10 + (distance/bounds);
-                }
-    
-                BatteryInfo_t oldInfo {0, 0};
-                
-                // Retrieve old info
-                if (xSemaphoreTake(xBatteryInfoMutex, pdMS_TO_TICKS(16)))
-                {
-                    oldInfo = batteryInfo;
-    
-                    xSemaphoreGive(xBatteryInfoMutex);
                 }
     
                 // If we had previous readings, let's average them out with our new ones
@@ -350,10 +353,13 @@ namespace {
 
         MelodyController melodyController;
 
-        
-
         uint32_t receivedSongMsg = 0;
         uint32_t ulInterruptStatus = 0;
+
+        bool receivedNotif = false;
+
+        TickType_t timeToSleep = pdMS_TO_TICKS(0);
+        TickType_t timeLastAwake = xTaskGetTickCount();
 
         for(;;)
         {
@@ -362,16 +368,57 @@ namespace {
             if ((receivedSongMsg & 0x80000000) == 0x80000000)
             {
                 const uint32_t msToSleep = receivedSongMsg ^ 0x80000000;
-                vTaskDelay(pdMS_TO_TICKS(msToSleep));
+                timeToSleep = pdMS_TO_TICKS(msToSleep);
+                // Sleep while still staying awake for notifications
+                receivedNotif = (xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, timeToSleep) == pdPASS);
             } else if (receivedSongMsg != 0)
             {
                 noteToPlay.cmdInfo = receivedSongMsg;
+                timeToSleep = pdMS_TO_TICKS(0);
                 xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
             } else
             {
                 // Sleep until notified that we should wake up
-                xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY);
-                melodyController.playSong(ulInterruptStatus, true);
+                receivedNotif = (xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY) == pdPASS);
+                timeLastAwake = xTaskGetTickCount();
+                timeToSleep = pdMS_TO_TICKS(0);
+            }
+
+            if (receivedNotif)
+            {
+                if ((ulInterruptStatus & 0x80000000UL) != 0)
+                {
+                    // Special commands
+                    switch (ulInterruptStatus)
+                    {
+                        case 0x80000001UL: // pause
+                            receivedNotif = (xTaskNotifyWait(0x0, 0xFFFFFFFFL, &ulInterruptStatus, portMAX_DELAY) == pdPASS);
+                            // resume should be discarded
+                            if (ulInterruptStatus == 0x80000002)
+                                receivedNotif = false;
+                            break;
+
+                        case 0x80000003UL: // stop
+                            melodyController.playSong(0, false);
+                            receivedNotif = false;
+                            break;
+
+                        default:
+                            receivedNotif = false;
+                            break;
+                    }
+                } else
+                {
+                    // Start new song
+                    melodyController.playSong(ulInterruptStatus, true);
+                    receivedNotif = false;
+                }
+            }
+
+            if (timeToSleep > pdMS_TO_TICKS(0))
+            {
+                vTaskDelayUntil(&timeLastAwake, timeToSleep);
+                timeLastAwake = xTaskGetTickCount();
             }
         }
     }
@@ -441,11 +488,11 @@ namespace {
 
         uint32_t ulInterruptStatus = 0;
 
-        uint16_t videoFrame = 0;
+        uint32_t videoFrame = 0;
+        uint16_t videoBlockFrame = 0;
 
         const TickType_t xFrameTargetTimeOffset33 = pdMS_TO_TICKS(33);
         const TickType_t xFrameTargetTimeOffset34 = pdMS_TO_TICKS(34);
-        uint8_t updateMod3 = 0;
 
         std::array<uint8_t, 36872>* decodedBuffer = &inflateBufferA;
 
@@ -453,7 +500,6 @@ namespace {
 
         // Wait until we have at least one block
         xTaskNotifyWait(0x0, 0xFFFFFFFFUL, &ulInterruptStatus, portMAX_DELAY);
-        bool startedSong = false;
 
         // Store battery info locally (to avoid not being able to access to it in case BatteryLvlTask is occupied)
         BatteryInfo_t batteryInfo_videoTask = {0, 0};
@@ -473,7 +519,7 @@ namespace {
                 while (framesExist)
                 {
                     // Insert video frame
-                    framesExist = videoController.displayVideoFrame(decodedBuffer, videoFrame);
+                    framesExist = videoController.displayVideoFrame(decodedBuffer, videoBlockFrame++);
                     
                     videoFrame++;
 
@@ -487,28 +533,47 @@ namespace {
 
                             xSemaphoreGive(xBatteryInfoMutex);
                         }
-                        spritesController.drawNumber(108,
-                            spritesController.drawText(108,1, "Voltage:"), 
-                        batteryInfo_videoTask.voltage, 10);
-            
-                        spritesController.drawText(90,
-                            spritesController.drawNumber(90,
-                                spritesController.drawText(90,1, "Level:"), 
-                            batteryInfo_videoTask.percentage, 10),
-                            "%"
-                        );
+
+                        // Non-linear, i know
+                        if (batteryInfo_videoTask.percentage > 70)
+                        {
+                            spritesController.drawSprite(107, 121, 1);
+                        }
+                        else if (batteryInfo_videoTask.percentage > 50)
+                        {
+                            spritesController.drawSprite(108, 121, 1);
+                        }
+                        else if (batteryInfo_videoTask.percentage > 30)
+                        {
+                            spritesController.drawSprite(109, 121, 1);
+                        }
+                        else if (batteryInfo_videoTask.percentage > 5)
+                        {
+                            spritesController.drawSprite(110, 121, 1);
+                        }
+                        else
+                        {
+                            if (videoFrame % 60 >= 30)
+                                spritesController.drawSprite(111, 121, 1);
+                            else
+                                spritesController.drawSprite(112, 121, 1);
+                        }
+
+                        if (videoFrame % 60 < 30)
+                        {
+                            spritesController.drawText(30, 7, "Press START");
+                            spritesController.drawText(22, 19, "to play");
+                        }
                     }
                     
                     // Send render command
                     xTaskNotify(xRenderTaskHandle, CMD_BEGIN_RENDER, eSetValueWithOverwrite);
                     
                     // This seeks to achieve exactly 30fps
-                    if (updateMod3++ != 2)
-                    vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset33);
-                    else {
+                    if ((videoFrame & 0b11) == 0b11) // faster x % 3 == 0
+                        vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset33);
+                    else
                         vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset34);
-                        updateMod3 = 0;
-                    }
                     xLastFrameTime = xTaskGetTickCount();
 
                     if (xTaskNotifyWait(0x0, 0xFFFFFFFFUL, &ulInterruptStatus, 0) == pdPASS)
@@ -526,7 +591,7 @@ namespace {
                 // Swap buffers
                 decodedBuffer = checkingBufferA ? &inflateBufferB : &inflateBufferA;
                 checkingBufferA = !checkingBufferA;
-                videoFrame = 0;
+                videoBlockFrame = 0;
                 
                 // if (!startedSong)
                 // {
@@ -585,10 +650,8 @@ namespace {
 
         bool weHaveDisplayControl = false;
 
-        xTaskNotify(xMelodyTaskHandle, 0x1, eSetValueWithOverwrite);
-
         for (;;) {
-            // Delta time calculations
+            // Delta time calculations (okay to put here bc the last thing we do is 'delay until')
             xPreviousFrameTime = xFrameStartTime;
             xFrameStartTime = xTaskGetTickCount();
             TickType_t deltaTime = xFrameStartTime - xPreviousFrameTime;
@@ -613,6 +676,7 @@ namespace {
                                 // Open game when releasing pause
                                 case CMD_START_BTN:   {
                                     ScreenState = SCREEN_GAME; 
+                                    xTaskNotify(xMelodyTaskHandle, 0x1, eSetValueWithOverwrite);
                                     playfieldController.initializePlayfield();  
                                     while (!weHaveDisplayControl)
                                     {
@@ -677,6 +741,7 @@ namespace {
                                         xSemaphoreGive(xDisplayControlMutex);
                                         vTaskDelay(pdMS_TO_TICKS(1));
                                         ScreenState = SCREEN_MAINMENU;
+                                        xTaskNotify(xMelodyTaskHandle, 0x80000003, eSetValueWithOverwrite);
                                         break;
                                     }
                                 default:                                                             break;

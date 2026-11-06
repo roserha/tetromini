@@ -216,15 +216,8 @@ void PlayfieldController::finishDroppingPiece()
 
     currentPiece = nextPiece;
     currentSpinState = ZeroDeg;
+    pieceXPos = 4;
     pieceYPos = 20;
-    if (currentPiece == OBlock)
-    {
-        pieceXPos = 5;
-    }
-    else
-    {
-        pieceXPos = 4;
-    }
     nextPiece = pullNewPiece();
 
     checkForLineClear = true;
@@ -281,6 +274,8 @@ void PlayfieldController::initializePlayfield()
     
     currentPiece = pullNewPiece();
     nextPiece = pullNewPiece();
+    pieceXPos = 4;
+    pieceYPos = 20;
     updatePhantomPiecePosition();
 }
 
