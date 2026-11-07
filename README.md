@@ -1,4 +1,5 @@
 # Tetromini - STM Edition (In active development)
+![Tetromini Header](./Resources/Header.webp)
 
 This is a refactor of the old Nordic/Zephyr version of the project for the STM32F405/freeRTOS pipeline that is archived in `dev`!
 
@@ -84,13 +85,13 @@ sequenceDiagram
     Audio->>MCU: Initialize amp via I2S + DMA
 
     par Frame Math
-        loop Single Frame (every ~16ms)
+        loop Single Frame (every ~33ms)
             Game->>Game: Process inputs from input queue
             Game->>Game: Process logic dependent on Screen State
             Game->>Audio: Send any SFX to play, if appropriate
             Game->>App: Update framebuffer (mutexed)
             Game->>Render: Notify frame is ready to be rendered
-            Game->>Game: Sleep for ~16ms
+            Game->>Game: Sleep for ~33ms
             Render->>MCU: Transmit updated framebuffer to SSD1309 via DMA (mutexed FB + waits on semaphored DMA state)
             Render->>Render: Sleep until transfer finished or timed out
             MCU->>Render: Notify transfer finished
@@ -125,20 +126,26 @@ sequenceDiagram
             ButtonISR->>Game: Send input to buffer upon rising or falling edge
         end
     and Video
-      App->>Decoder: Tell Decoder Controller to start Video Playback
-      loop Per Video Command
-        par Decoding
-          Decoder->>Decoder: Get pointer to whichever block we are inflating
-          Decoder->>Decoder: Use ZLib Turbo to inflate current block
-          Decoder->>Video: Send inflated block to video when ready
-        and Playback
-          Video->>Video: Wait for decoded buffer
-          Video->>App: Update framebuffer with first frame (mutexed)
-          loop Per buffer until "EOF"
+      loop Every 2s
+        par Playback
+          Video->>Video: Render first buffer
+          loop Until "EOF"
+            Video->>App: Update framebuffer with frame (mutexed)
             Video->>Video: Sleep for ~33ms
-            Video->>App: XOR Framebuffer with new i-frame
           end
-          Video->>Decoder: Alert ready to receive new buffer
+          Video->>Decoder: Alert first half was rendered
+          Video->>Video: Render second buffer
+          loop Until "EOF"
+            Video->>App: Update framebuffer with frame (mutexed)
+            Video->>Video: Sleep for ~33ms
+          end
+          Video->>Decoder: Alert second half was rendered
+        and Decoding
+          loop Continuously
+            Decoder->>Decoder: Await notifications (change video, new buffer ready)
+            MCU->>Decoder: Read video content from flash
+            Decoder->>App: INFLATE block into buffer
+          end
         end
       end
     end
@@ -263,13 +270,23 @@ Each sprite, when rendered, is stored in a framebuffer that gets sent via SPI + 
 
 Given that a singular second of stored audio would be 96KB given an audio playback of 48kHz and 16-bit amplitude resolution, it is impractical (to put it lightly) to store full scores. As such, given the programmed behaviour of the Audio Task, songs are stored as several "play note" and "sleep" commands calculated from a given MIDI file.
 
-Commands are arranged as follows: a 32-bit word arranged with masks as follows: `0x1F` for note (N), `0xE0` for octave (C), `0xFF00` for length (L), `0x7F0000` for volume (V), `0x7F800000` for waveId (W) for a final word `0b0WWW WWWW WVVV VVVV LLLL LLLL CCCN NNNN`. The most significant bit is restricted to indicate a wait time on stored songs, followed by a 31-bit integer indicating how many milliseconds to sleep before the next command.
+Commands are arranged as follows: a 32-bit word arranged with masks as follows: `0x1F` for note (N), `0xE0` for octave (C), `0xFFF00` for length (L), `0x7F00000` for volume (V), `0x78000000` for waveId (W) for a final word `0b0WWW WVVV VVVV LLLL LLLL LLLL CCCN NNNN`. The most significant bit is restricted to indicate a wait time on stored songs, followed by a 31-bit integer indicating how many milliseconds to sleep before the next command.
 
 This made it such that, for example, the `main_song.mid` file, whose raw uncompressed wave would occupy **3.686MB** for a 38.4s playback, and MIDI file occupies *2.4KB*, takes up around *1.932KB* in flash! It does depend on the arrangement, however, because a 20.5KB piano arrangement MIDI takes up ~25KB. It still beats its theoretical uncompressed size of ~20MB!
 
 ## Audio Synthesization
 
 To generate the sound waves for the different instruments, the raw amplitudes of a single wave are stored as 600 16-bit integers spread equidistant across the single wavelength, and a "jump" floating point number is calculated based on the wave's desired pitch and the 48kHz playback. This means each instrument takes up around 1.2KB. Upon playback, we use that number to "jump" across amplitudes during playback to simulate pitch shifting. Each wave has an attack and decay envelope to avoid crackling on consecutive playbacks. The audio system can support up to `kChannelNumber` different waves to be played at the same time. A 256-integer-long buffer is then sent via I2S + Circular DMA to the I2S Breakout, and each half is filled based on ISR routines sent by the DMA coroutine.
+
+## Video Playback
+
+For the Main Menu screen, a 3D animation plays. This would be computationally intensive to generate on the fly, and as such, a video encoding system was devised via a double circular buffer. The video task reads from two buffers of 36 frames each, and whenever one's reading is finished, it alerts the decoding task that that buffer is ready for new frames, and goes onto the next, so on ad infinitum (or as infinitum as a game console can be). Because GameTask initially was the only one that rendered information to the screen, VideoTask and GameTask now take turns having ownership of a DisplayControl mutex, so one task doesn't render over another.
+
+## Video Encoding/Decoding
+
+Given the size of video files and our RAM, it would be impractical to store the entire video in the heap (let alone any task's stack). As such, we store two buffers of decoded output and processing buffers inside the decoder itself. Video frames are encoded to be in the same bit resolution and pixel order as the framebuffer, and groups of 36 (or less for the leftovers) are stored together and DEFLATEd together using ZLIB. For decoding, I utilize [zlib_turbo](https://github.com/bitbank2/zlib_turbo/tree/main) for faster performance, with some modifications for it to fit my firmware's intended behaviour. 72 frames of animation get stored in 6.5KB in flash, compared to the overall 73.74KB that both blocks (comprised of 72 frames) take up.
+
+With Video and Audio available, I hid a little fun easter egg inside of the project! You can read the source code to figure out what music video gets played, but I'm happy to say that its ~6500 frames only take up 479KB of space in flash!
 
 ## "Random" Piece Generation
 Since RTOSs are to be deterministic machines, true randomness isn't recommended. However, it is wished that games don't look the same across gameplays. As such, a custom pseudorandom number generation system was created in addition to a traditional "bag system" wherein each of the 7 pieces are pulled from a metaphorical "bag" before being reshuffled when all of them are pulled. This bag system ensures that no same piece is ever pulled more than twice in a row.

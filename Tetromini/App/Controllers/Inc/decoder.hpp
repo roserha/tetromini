@@ -16,8 +16,21 @@ class DecoderController {
         DecoderController(zlib_turbo *dec, std::array<uint8_t, 36872> *inflateBufferA, std::array<uint8_t, 36872> *inflateBufferB):
             _decoder(dec), _inflateBuffer_A(inflateBufferA), _inflateBuffer_B(inflateBufferB) {}
 
+        /**
+         * @brief Choose which video to decode
+         * Initializes decoder based on the provided `fileId`. Based on said id, will set up current pointer and
+         * read how many blocks we have on the video file based on the first 2 bytes.
+         */
         void initializeDecoder(const uint8_t fileId);
         
+        /**
+         * @important MUST RUN INITIALIZATION BEFORE EXECUTING THIS. Otherwise, nothing will be decoded!
+         * @brief Decode most recently undecoded block from file
+         * Decodes the current encoded block of the file buffer and outputs it into one of two checkbuffers
+         * we have.
+         * @param checkBufferA will use bufferA for output if true, bufferB otherwise. Based on VideoTask's
+         * response of which buffer it just finished checking.
+         */
         void decodeBlock(bool checkBufferA);
 
     private:

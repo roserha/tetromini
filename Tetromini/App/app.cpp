@@ -46,7 +46,7 @@ namespace {
     constexpr uint32_t    kRenderStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
     StackType_t           renderStack[kRenderStackWords];           // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          renderTcb;                                // FreeRTOS task control block for the task
-    constexpr UBaseType_t kRenderPriority = tskIDLE_PRIORITY + 2;   // 2 levels above idle (higher = more important)
+    constexpr UBaseType_t kRenderPriority = tskIDLE_PRIORITY + 5;   // 5 levels above idle (higher = more important)
     TaskHandle_t          xRenderTaskHandle = NULL;                 // Task handle for notifications
 
     void renderTask(void*)
@@ -227,7 +227,7 @@ namespace {
     constexpr uint32_t    kAudioStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
     StackType_t           audioStack[kAudioStackWords];            // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          audioTcb;                                // FreeRTOS task control block for the task
-    constexpr UBaseType_t kAudioPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+    constexpr UBaseType_t kAudioPriority = tskIDLE_PRIORITY + 6;   // 6 levels above idle (higher = more important)
     QueueHandle_t         xAudioQueue = NULL;                      // Notes queue to avoid race conditions
     TaskHandle_t          xAudioTaskHandle = NULL;                 // Task handle for notifications
 
@@ -343,7 +343,7 @@ namespace {
     constexpr uint32_t    kMelodyStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
     StackType_t           melodyStack[kMelodyStackWords];            // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          melodyTcb;                                // FreeRTOS task control block for the task
-    constexpr UBaseType_t kMelodyPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+    constexpr UBaseType_t kMelodyPriority = tskIDLE_PRIORITY + 4;   // 4 levels above idle (higher = more important)
     TaskHandle_t          xMelodyTaskHandle = NULL;                 // Task handle for notifications
 
     void melodyTask(void *)
@@ -483,7 +483,7 @@ namespace {
     constexpr uint32_t    kVideoStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
     StackType_t           videoStack[kVideoStackWords];            // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          videoTcb;                                // FreeRTOS task control block for the task
-    constexpr UBaseType_t kVideoPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+    constexpr UBaseType_t kVideoPriority = tskIDLE_PRIORITY + 1;   // 1 level above idle (higher = more important)
 
     void videoTask(void *)
     {
@@ -569,6 +569,8 @@ namespace {
                             spritesController.drawText(30, 7, "Press START");
                             spritesController.drawText(22, 19, "to play");
                         }
+
+                        spritesController.drawText(7,1, "(c) rosecod.es");
                     }
                     
                     // Send render command
@@ -615,7 +617,7 @@ namespace {
     constexpr uint32_t    kGameStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
     StackType_t           gameStack[kGameStackWords];             // the task's own stack (32-bit words on Cortex-M)
     StaticTask_t          gameTcb;                                // FreeRTOS task control block for the task
-    constexpr UBaseType_t kGamePriority = tskIDLE_PRIORITY + 1;   // 1 level above idle (higher = more important)
+    constexpr UBaseType_t kGamePriority = tskIDLE_PRIORITY + 2;   // 2 levels above idle (higher = more important)
     QueueHandle_t xGameInputQueue = NULL;                         // Input queue
 
     typedef enum

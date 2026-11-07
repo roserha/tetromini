@@ -14,6 +14,13 @@ class VideoController {
         VideoController(std::array<uint8_t, GraphicsController::kFrameBufferSize>* frame_buffer, SemaphoreHandle_t* xFrameBufferMutex):
             _frame_buffer(frame_buffer), _xFrameBufferMutex(xFrameBufferMutex) {}
 
+        /**
+         * @brief Display video frame `videoFrame` from `videoBuffer`
+         * Copy frame `videoFrame`'s data from `videoBuffer` into the system's framebuffer.
+         * @param videoBuffer current block of buffer we're reading
+         * @param videoFrame what frame inside block we're copying
+         * @return bool true if frame was successfully copied, false otherwise (when we ran out of frames)
+         */
         bool displayVideoFrame(std::array<uint8_t, 36872> *videoBuffer, uint16_t videoFrame);
 
     private:
