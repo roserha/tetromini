@@ -465,6 +465,11 @@ namespace {
                     decoderController.decodeBlock(true);
                     break;
 
+                case 0x80000000:
+                case 0x80000001: // Change decoder to Bapple or Main Menu (dep on last bit)!
+                    decoderController.initializeDecoder(ulInterruptStatus & 0xF);
+                    break;
+
                 default:
                     break;
             }
@@ -584,6 +589,9 @@ namespace {
                             weHaveMutex = false;
                             vTaskDelayUntil(&xLastFrameTime, xFrameTargetTimeOffset33);
                             break;
+                        } else if (ulInterruptStatus == CMD_HIDE_MENU_INFO)
+                        {
+                            showMenuText = false;
                         }
                     }
                 }
@@ -613,9 +621,9 @@ namespace {
     typedef enum
     {
         SCREEN_MAINMENU,
+        SCREEN_EASTEREGG,
         SCREEN_GAME,
         SCREEN_LOW_BATTERY,
-        SCREEN_SHUTDOWNMSG,
         SCREEN_ERR
     } Screen_t;
 
@@ -641,6 +649,8 @@ namespace {
         uint8_t updateMod3 = 0;
 
         bool weHaveDisplayControl = false;
+
+        uint8_t mainmenuEasterEgg = 0;
 
         for (;;) {
             // Delta time calculations (okay to put here bc the last thing we do is 'delay until')
@@ -744,35 +754,132 @@ namespace {
                                         }
                                     }
                                 } break;
-                                case CMD_ROT_CCW_BTN: 
-                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 0, 6, 20, 250);
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    break;
-                                case CMD_ROT_CW_BTN:  
-                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 2, 6, 20, 250);
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    break;
-                                case CMD_UP_BTN:      
-                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 4, 6, 20, 250);
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    break;
-                                case CMD_DOWN_BTN:    
-                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 5, 6, 20, 250);
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    break;
-                                case CMD_LEFT_BTN:    
-                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 7, 6, 20, 250);
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    break;
-                                case CMD_RIGHT_BTN:   
-                                    noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 9, 6, 20, 250);
-                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
-                                    break;
                                 default: break;
                             }
                             break;
                         }
+                        else { // Pressing
+                            switch (xReceivedCmd.cmdType)
+                            {
+                                case CMD_ROT_CCW_BTN: 
+                                    switch (mainmenuEasterEgg)
+                                    {
+                                        case 8:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 3, 6, 20, 250);
+                                            mainmenuEasterEgg = 9;
+                                            break;
 
+                                        default:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 11, 5, 20, 250);
+                                            mainmenuEasterEgg = 0;
+                                            break;
+                                    }
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_ROT_CW_BTN:  
+                                    switch (mainmenuEasterEgg)
+                                    {
+                                        case 9:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 10, 6, 20, 250);
+                                            mainmenuEasterEgg = 10;
+                                            break;
+
+                                        default:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 1, 6, 20, 250);
+                                            mainmenuEasterEgg = 0;
+                                            break;
+                                    }
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_UP_BTN:    
+                                    switch (mainmenuEasterEgg)
+                                    {
+                                        case 1:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 5, 6, 20, 250);
+                                            mainmenuEasterEgg = 2;
+                                            break;
+
+                                        default:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 3, 6, 20, 250);
+                                            mainmenuEasterEgg = 1;
+                                            break;
+                                    }
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_DOWN_BTN:    
+                                    switch (mainmenuEasterEgg)
+                                    {
+                                        case 3:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 8, 6, 20, 250);
+                                            mainmenuEasterEgg = 4;
+                                            break;
+
+                                        case 2:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 6, 6, 20, 250);
+                                            mainmenuEasterEgg = 3;
+                                            break;
+
+                                        default:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 4, 6, 20, 250);
+                                            mainmenuEasterEgg = 0;
+                                            break;
+                                    }
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_LEFT_BTN:    
+                                    switch (mainmenuEasterEgg)
+                                    {
+                                        case 6:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 1, 7, 20, 250);
+                                            mainmenuEasterEgg = 7;
+                                            break;
+
+                                        case 4:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 10, 6, 20, 250);
+                                            mainmenuEasterEgg = 5;
+                                            break;
+
+                                        default:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 6, 6, 20, 250);
+                                            mainmenuEasterEgg = 0;
+                                            break;
+                                    }
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_RIGHT_BTN:   
+                                    switch (mainmenuEasterEgg)
+                                    {
+                                        case 7:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 10, 6, 20, 250);
+                                            mainmenuEasterEgg = 8;
+                                            break;
+
+                                        case 5:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 3, 7, 20, 250);
+                                            mainmenuEasterEgg = 6;
+                                            break;
+
+                                        default:
+                                            noteToPlay.cmdInfo = AudioController::sampleToUlValue(4, 8, 6, 20, 250);
+                                            mainmenuEasterEgg = 0;
+                                            break;
+                                    }
+                                    xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
+                                    break;
+                                case CMD_START_BTN:
+                                    if (mainmenuEasterEgg == 10)
+                                    {
+                                        ScreenState = SCREEN_EASTEREGG;
+                                        xTaskNotify(xVideoTaskHandle, CMD_HIDE_MENU_INFO, eSetValueWithOverwrite);
+                                        xTaskNotify(xDecoderTaskHandle, 0x80000001, eSetValueWithOverwrite);
+                                        vTaskDelay(pdMS_TO_TICKS(1024));
+                                        xTaskNotify(xMelodyTaskHandle, 0x2, eSetValueWithOverwrite);
+                                        vTaskDelay(portMAX_DELAY);
+                                    }
+                                    break;
+                                default: break;
+                            }
+                        }
                     default: break;
                 }
             }
