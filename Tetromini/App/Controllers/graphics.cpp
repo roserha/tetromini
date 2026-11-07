@@ -24,7 +24,7 @@ void GraphicsController::setPixel(const uint_fast8_t x, const uint_fast8_t y, co
     return;
 }
 
-void GraphicsController::unfilledRect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on)
+void GraphicsController::unfilledRect(const uint_fast8_t x, const uint_fast8_t y, const uint_fast8_t w, const uint_fast8_t h, const bool on)
 {
     if (w == 0 || h == 0)
     {
@@ -56,7 +56,7 @@ void GraphicsController::unfilledRect(uint_fast8_t x, uint_fast8_t y, uint_fast8
     }
 }
 
-void GraphicsController::filledRect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on)
+void GraphicsController::filledRect(const uint_fast8_t x, const uint_fast8_t y, const uint_fast8_t w, const uint_fast8_t h, const bool on)
 {
     uint_fast8_t xpw = x + w;
     uint_fast8_t yph = y + h;

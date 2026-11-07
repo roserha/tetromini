@@ -1,6 +1,9 @@
 # build output (CMake)
 build/
 
+# bapple frames
+*_frames/
+
 # KiCad stuff
 .history/
 *-backups/

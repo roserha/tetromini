@@ -52,6 +52,31 @@ add_custom_target(make_melodies
 
 add_dependencies(${CMAKE_PROJECT_NAME} make_melodies)
 
+# Add bapple easter egg video to binary by generating object file from bapple.bin
+# We won't autogenerate it on every build bc the bapple tree script takes an ETERNITY to execute
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/bapple.o
+    COMMAND arm-none-eabi-objcopy --input-target binary --output-target elf32-littlearm 
+            --rename-section .data=.rodata,alloc,load,readonly,data,contents
+            --binary-architecture arm bapple.bin 
+            ${CMAKE_CURRENT_BINARY_DIR}/bapple.o
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Scripts
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Scripts/bapple.bin
+    VERBATIM
+)
+
+# Add main menu video to binary by generating object file from mainmenu.bin
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/mainmenu.o
+    COMMAND arm-none-eabi-objcopy --input-target binary --output-target elf32-littlearm 
+            --rename-section .data=.rodata,alloc,load,readonly,data,contents
+            --binary-architecture arm mainmenu.bin 
+            ${CMAKE_CURRENT_BINARY_DIR}/mainmenu.o
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/Scripts
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Scripts/mainmenu.bin
+    VERBATIM
+)
+
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
 
@@ -65,12 +90,17 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
     App/app.cpp
     App/Drivers/ssd1309.cpp
+    App/Drivers/zlib_turbo.cpp
     App/Controllers/graphics.cpp
     App/Controllers/sprites.cpp
     App/Controllers/tetromino.cpp
     App/Controllers/playfield.cpp
     App/Controllers/audio.cpp
     App/Controllers/melody.cpp
+    App/Controllers/video.cpp
+    App/Controllers/decoder.cpp
+    ${CMAKE_CURRENT_BINARY_DIR}/bapple.o
+    ${CMAKE_CURRENT_BINARY_DIR}/mainmenu.o
 )
 
 # Add include paths

@@ -5,8 +5,8 @@
 // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
 ///////////////////////////////////////////////////////////
 
-#define SPRITE_NUM 107
-// Storage taken by sprites:                749B
+#define SPRITE_NUM 113
+// Storage taken by sprites:                791B
 
 ///////////////////////////////////////////////////////////
 // ^ THE CONTENTS ABOVE WERE PROGRAMATICALLY GENERATED ^ //
@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <array>
 #include "graphics.hpp"
+#include "types.hpp"
 
 /// @brief The SpritesController class is responsible for storing the sprites that get drawn to the screen.
 class SpritesController {
@@ -42,7 +43,7 @@ class SpritesController {
          * @param y y coordinate [0,64)
          * @return uint8_t The total length of the drawn sprite [1,6] if sprite_id is valid, 0 otherwise
          */
-        uint8_t drawSprite(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y);
+        uint8_t drawSprite(const uint_fast8_t sprite_id, const uint_fast8_t x, const uint_fast8_t y);
 
         /**
          * @brief Draw tetromino block
@@ -51,10 +52,10 @@ class SpritesController {
          * 
          * @param x x coordinate [0,10]
          * @param y y coordinate [0,18]
-         * @param block_type which block to draw based on block enum ids [0,7] (7 means empty block)
+         * @param block_type which block to draw based on Tetromino_t enum ids
          * @return bool `true` if successfully drawn, `false` if block is OOB
          */
-        bool drawBlock(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type);
+        bool drawBlock(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type);
 
         /**
          * @brief Write text
@@ -67,7 +68,7 @@ class SpritesController {
          * @param sentence *null-terminated* string
          * @return uint8_t y position of the caret after writing text, allows for nested texts/numbers
          */
-        uint_fast8_t drawText(uint_fast8_t x, uint_fast8_t y, const char *sentence);
+        uint_fast8_t drawText(const uint_fast8_t x, const uint_fast8_t y, const char *sentence);
 
         /**
          * @brief Write number
@@ -81,7 +82,7 @@ class SpritesController {
          * @param base base to print the number at [2,62]
          * @return uint8_t y position of the caret after writing number, allows for nested texts/numbers
          */
-        uint_fast8_t drawNumber(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base);
+        uint_fast8_t drawNumber(const uint_fast8_t x, const uint_fast8_t y, const int32_t number, const uint_fast8_t base);
     private:
 
         GraphicsController *_graphics_controller;
@@ -89,7 +90,7 @@ class SpritesController {
         // v THE CONTENTS BELOW WERE PROGRAMATICALLY GENERATED v //
         ///////////////////////////////////////////////////////////
 
-        static constexpr std::array<uint8_t, 749> kSpriteArray = {
+        static constexpr std::array<uint8_t, 791> kSpriteArray = {
             6, 0b111111, 0b100001, 0b101101, 0b101101, 0b100001, 0b111111,
             6, 0b111111, 0b110101, 0b101011, 0b110101, 0b101011, 0b111111,
             6, 0b111111, 0b100001, 0b100001, 0b100001, 0b100001, 0b111111,
@@ -196,7 +197,13 @@ class SpritesController {
             6, 0b010000, 0b101010, 0b100101, 0b101010, 0b010000, 0b101000,
             6, 0b101010, 0b000001, 0b100000, 0b000001, 0b100000, 0b010101,
             2, 0b011110, 0b100001, 0b000000, 0b000000, 0b000000, 0b000000,
-            2, 0b100001, 0b011110, 0b000000, 0b000000, 0b000000, 0b000000
+            2, 0b100001, 0b011110, 0b000000, 0b000000, 0b000000, 0b000000,
+            4, 0b111110, 0b111111, 0b111111, 0b111110, 0b000000, 0b000000,
+            4, 0b111110, 0b111101, 0b111101, 0b111110, 0b000000, 0b000000,
+            4, 0b111110, 0b111001, 0b111001, 0b111110, 0b000000, 0b000000,
+            4, 0b111110, 0b110001, 0b110001, 0b111110, 0b000000, 0b000000,
+            6, 0b111110, 0b110001, 0b110001, 0b111110, 0b000000, 0b101111,
+            6, 0b111110, 0b100001, 0b100001, 0b111110, 0b000000, 0b101111
         };
 
         ///////////////////////////////////////////////////////////

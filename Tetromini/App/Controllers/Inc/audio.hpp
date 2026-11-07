@@ -51,25 +51,25 @@ class AudioController {
          * @brief Transforms info about sample into a task notification word
          * Given the parameters, return the appropriate ulValue that will be correctly
          * interpreted inside the AudioTask.
-         * @param waveNumber which wave to play [0, 256)
+         * @param waveNumber which wave to play [0, 15]
          * @param note what note to play [0, 11], 0 = C, 1 = C#, 11 = B
          * @param octave how many octaves below 8th [0, 7]
-         * @param volume what volume to play it in [0, 128)
-         * @param length how long sample should last [4, 2048) (4ms resolution, floored)
+         * @param volume what volume to play it in (in 128ths of original amplitude) [0, 128)
+         * @param length how long sample should last in ms [1, 4095]
          * @returns 32-bit word arranged with masks as follows: `0x1F` for note (N), `0xE0` for octave (C), `0xFF00` for length (L), 
          * `0x7F0000` for volume (V), `0x7F800000` for waveId (W) for word
-         * (`0b0WWW WWWW WVVV VVVV LLLL LLLL CCCN NNNN`). Most significant bit is restricted to indicate a wait time on stored songs :)
+         * (`0b0WWW WVVV VVVV LLLL LLLL LLLL CCCN NNNN`). Most significant bit is restricted to indicate a wait time on stored songs :)
          */
-        static uint32_t sampleToUlValue(uint32_t waveNumber, uint32_t note, uint32_t octave, uint32_t volume, uint32_t length)
+        static uint32_t sampleToUlValue(const uint32_t waveNumber, const uint32_t note, const uint32_t octave, const uint32_t volume, const uint32_t length)
         {
             if (octave == 0)
                 return 0;
-            uint32_t value = (note & 0x1fL) | ((octave & 0x7L) << 5L) | ((length & 0x7fcL) << 6L) | ((volume & 0x7fL) << 16L) | ((waveNumber & 0xffL) << 23L);
+            uint32_t value = (note & 0x1fL) | ((octave & 0x7L) << 5L) | ((length & 0xfffL) << 8L) | ((volume & 0x7fL) << 20L) | ((waveNumber & 0xfL) << 27L);
             return value;
         }
 
     private:
-        static constexpr uint32_t kChannelNumber = 4;
+        static constexpr uint32_t kChannelNumber = 16;
         std::array<SoundChannel_t, kChannelNumber> Channels;
         uint16_t lastSample = 0; // <- to avoid snaps in between repeated notes
 

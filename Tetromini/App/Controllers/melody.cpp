@@ -1,6 +1,6 @@
 #include "melody.hpp"
 
-void MelodyController::playSong(uint8_t songId, bool loop)
+void MelodyController::playSong(const uint8_t songId, const bool loop)
 {
     currentSong = songId;
     currentSongMessage = 0;
@@ -17,8 +17,9 @@ uint32_t MelodyController::getSongMessage()
 
     switch (currentSong)
     {
-        case 1:  msgToReturn = main_song[currentSongMessage++]; songLoopIndex = main_song.size(); break;        
-        default:                                                                                  break;
+        case 1:  msgToReturn = main_song[currentSongMessage++]; songLoopIndex = main_song.size();     break;        
+        case 2:  msgToReturn = bapple_song[currentSongMessage++]; songLoopIndex = bapple_song.size(); break;        
+        default:                                                                                      break;
     }
 
     if (currentSongMessage == songLoopIndex)

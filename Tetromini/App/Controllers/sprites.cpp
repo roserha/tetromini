@@ -1,6 +1,6 @@
 #include "sprites.hpp"
 
-uint8_t SpritesController::drawSprite(uint_fast8_t sprite_id, uint_fast8_t x, uint_fast8_t y)
+uint8_t SpritesController::drawSprite(const uint_fast8_t sprite_id, const uint_fast8_t x, const uint_fast8_t y)
 {
     if (sprite_id >= SPRITE_NUM)
     {
@@ -24,14 +24,14 @@ uint8_t SpritesController::drawSprite(uint_fast8_t sprite_id, uint_fast8_t x, ui
     return hor_res;
 }
 
-bool SpritesController::drawBlock(uint_fast8_t x, uint_fast8_t y, uint_fast8_t block_type)
+bool SpritesController::drawBlock(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type)
 {
-    if (x >= 10 || y >= 18 || block_type > 7) { return false; }
+    if (x >= 10 || y >= 18) { return false; }
 
     uint_fast8_t x_raw = y * 6 + 2;
     uint_fast8_t y_raw = x * 6 + 2;
 
-    if (block_type > 0)
+    if (block_type != Empty)
     {
         drawSprite(block_type - 1, x_raw, y_raw);
     } 
@@ -43,7 +43,7 @@ bool SpritesController::drawBlock(uint_fast8_t x, uint_fast8_t y, uint_fast8_t b
     return true;
 }
 
-uint_fast8_t SpritesController::drawText(uint_fast8_t x, uint_fast8_t y, const char *sentence)
+uint_fast8_t SpritesController::drawText(const uint_fast8_t x, const uint_fast8_t y, const char *sentence)
 {
     uint_fast8_t index = 0;
     uint_fast8_t caret_distance = 0;
@@ -146,7 +146,7 @@ uint_fast8_t SpritesController::drawText(uint_fast8_t x, uint_fast8_t y, const c
     return y + caret_distance;
 }
 
-uint_fast8_t SpritesController::drawNumber(uint_fast8_t x, uint_fast8_t y, int32_t number, uint_fast8_t base)
+uint_fast8_t SpritesController::drawNumber(const uint_fast8_t x, const uint_fast8_t y, const int32_t number, const uint_fast8_t base)
 {
     int32_t remainder = number;
     uint_fast8_t caret_distance = 0;

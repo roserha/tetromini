@@ -1,6 +1,6 @@
 #include "tetromino.hpp"
 
-std::array<uint8_t, 8> TetrominoController::getTetrominoPositions(uint_fast8_t x, uint_fast8_t y, Tetromino_t block_type, Spin_t spin_state)
+std::array<uint8_t, 8> TetrominoController::getTetrominoPositions(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type, const Spin_t spin_state)
 {
     std::array<uint8_t, 8> positions = {0};
 
@@ -86,7 +86,7 @@ std::array<uint8_t, 8> TetrominoController::getTetrominoPositions(uint_fast8_t x
     return positions;
 }
 
-bool TetrominoController::drawTetromino(uint_fast8_t x, uint_fast8_t y, Tetromino_t block_type, Spin_t spin_state)
+bool TetrominoController::drawTetromino(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type, const Spin_t spin_state)
 {
     bool OutOfBounds = false;
     std::array<uint8_t, 8> Coordinates = getTetrominoPositions(x, y, block_type, spin_state);
@@ -99,7 +99,7 @@ bool TetrominoController::drawTetromino(uint_fast8_t x, uint_fast8_t y, Tetromin
     return OutOfBounds;
 }
 
-bool TetrominoController::drawPhantomTetromino(uint_fast8_t x, uint_fast8_t y, Tetromino_t block_type, Spin_t spin_state)
+bool TetrominoController::drawPhantomTetromino(const uint_fast8_t x, const uint_fast8_t y, const Tetromino_t block_type, const Spin_t spin_state)
 {
     bool OutOfBounds = false;
     std::array<uint8_t, 8> Coordinates = getTetrominoPositions(x, y, block_type, spin_state);

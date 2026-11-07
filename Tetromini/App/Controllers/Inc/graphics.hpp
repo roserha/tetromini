@@ -46,7 +46,7 @@ class GraphicsController {
          * @param h height
          * @param on pixel color (true = white, false = black)
          */
-        void unfilledRect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on);
+        void unfilledRect(const uint_fast8_t x, const uint_fast8_t y, const uint_fast8_t w, const uint_fast8_t h, const bool on);
 
         /**
          * @brief Draw filled rect
@@ -60,7 +60,7 @@ class GraphicsController {
          * @param h height
          * @param on pixel color (true = white, false = black)
          */
-        void filledRect(uint_fast8_t x, uint_fast8_t y, uint_fast8_t w, uint_fast8_t h, bool on);
+        void filledRect(const uint_fast8_t x, const uint_fast8_t y, const uint_fast8_t w, const uint_fast8_t h, const bool on);
 
     private:
         // Framebuffer. Each pixel is monochrome, so 8 consecutive pixels are bundled per byte

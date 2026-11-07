@@ -1,6 +1,6 @@
 #include "playfield.hpp"
 
-void PlayfieldController::setBlockState(uint8_t x, uint8_t y, uint8_t block_type)
+void PlayfieldController::setBlockState(const uint8_t x, const uint8_t y, const uint8_t block_type)
 {
     if (x >= 10 || y >= 22 || block_type > 7) { return; }
 
@@ -22,7 +22,7 @@ void PlayfieldController::renderPlayfield()
         {
             uint32_t tileMask = (0b111 << (j * 3));
             uint32_t tileData = (PlayfieldRow & tileMask) >> (j * 3);
-            uint_fast8_t blockStyle = tileData & 0b111;
+            Tetromino_t blockStyle = static_cast<Tetromino_t>(tileData & 0b111);
             _spritesController->drawBlock(j, i, blockStyle);
         }
     }
@@ -32,6 +32,20 @@ void PlayfieldController::renderPlayfield()
 
     // Draw current tetromino
     _tetrominoController->drawTetromino(pieceXPos, pieceYPos - 1, currentPiece, currentSpinState);
+
+    // Draw pased logo if paused
+    if (gameIsPaused)
+    {
+        // Draw pause bars
+        if ((stopwatch & 0x7FF) < 1024)
+        {
+            _graphicsController->filledRect(30,6,68,20, false);
+            _graphicsController->filledRect(32,8,64,16, true);
+
+            _graphicsController->filledRect(30,38,68,20, false);
+            _graphicsController->filledRect(32,40,64,16, true);
+        }
+    }
 }
 
 void PlayfieldController::renderPlayfieldHeader()
@@ -90,7 +104,7 @@ Tetromino_t PlayfieldController::pullNewPiece()
     return piece;
 }
 
-bool PlayfieldController::checkForCollision(Tetromino_t block_type, Spin_t spin_state, uint_fast8_t x, uint_fast8_t y)
+bool PlayfieldController::checkForCollision(const Tetromino_t block_type, const Spin_t spin_state, const uint_fast8_t x, const uint_fast8_t y)
 {
     std::array<uint8_t, 8U> Coordinates = _tetrominoController->getTetrominoPositions(x, y, block_type, spin_state);
 
@@ -136,27 +150,30 @@ bool PlayfieldController::checkForCollision(Tetromino_t block_type, Spin_t spin_
     return false;
 }
 
-void PlayfieldController::rotateCurrentPiece(bool right)
+void PlayfieldController::rotateCurrentPiece(const bool clockwise)
 {
+    if (gameIsPaused)
+        return;
+
     Spin_t desiredSpinState = currentSpinState;
 
     switch (currentSpinState)
     {
         case ZeroDeg:
-            desiredSpinState = right ? TwoSeventyDeg : NinetyDeg;
+            desiredSpinState = clockwise ? TwoSeventyDeg : NinetyDeg;
             break;
 
         case TwoSeventyDeg:
-            desiredSpinState = right ? OneEightyDeg : ZeroDeg;
+            desiredSpinState = clockwise ? OneEightyDeg : ZeroDeg;
             break;
 
         case OneEightyDeg:
-            desiredSpinState = right ? NinetyDeg : TwoSeventyDeg;
+            desiredSpinState = clockwise ? NinetyDeg : TwoSeventyDeg;
             break;
 
         default:
         case NinetyDeg:
-            desiredSpinState = right ? ZeroDeg : OneEightyDeg;
+            desiredSpinState = clockwise ? ZeroDeg : OneEightyDeg;
             break;
     }
 
@@ -193,8 +210,11 @@ void PlayfieldController::rotateCurrentPiece(bool right)
     }
 }
 
-void PlayfieldController::moveCurrentPiece(bool right)
+void PlayfieldController::moveCurrentPiece(const bool right)
 {
+    if (gameIsPaused)
+        return;
+
     bool willItCollide = checkForCollision(currentPiece, currentSpinState, pieceXPos + (right ? 1 : -1), pieceYPos);
     if (!willItCollide)
     {
@@ -216,15 +236,8 @@ void PlayfieldController::finishDroppingPiece()
 
     currentPiece = nextPiece;
     currentSpinState = ZeroDeg;
+    pieceXPos = 4;
     pieceYPos = 20;
-    if (currentPiece == OBlock)
-    {
-        pieceXPos = 5;
-    }
-    else
-    {
-        pieceXPos = 4;
-    }
     nextPiece = pullNewPiece();
 
     checkForLineClear = true;
@@ -248,11 +261,14 @@ void PlayfieldController::softDropCurrentPiece()
 
 void PlayfieldController::hardDropCurrentPiece()
 {
+    if (gameIsPaused)
+        return;
+
     pieceYPos = phantomYPos;
     finishDroppingPiece();
 }
 
-void PlayfieldController::setSoftDropStatus(bool status)
+void PlayfieldController::setSoftDropStatus(const bool status)
 {
     softDropping = status;
 }
@@ -273,20 +289,27 @@ void PlayfieldController::updatePhantomPiecePosition()
 
 void PlayfieldController::initializePlayfield()
 {
+    // Set playfield to be empty
+    Playfield.fill(0);
     // Initialize us at a random state of seen pieces
     uint64_t rand = (3739 * stopwatch + *_salt);
     seen_pieces = rand & 0b1111111;
     
     currentPiece = pullNewPiece();
     nextPiece = pullNewPiece();
+    pieceXPos = 4;
+    pieceYPos = 20;
     updatePhantomPiecePosition();
+
+    gameIsPaused = false;
 }
 
-void PlayfieldController::tickPlayfield(uint32_t delta_time, uint32_t elapsed_time)
+void PlayfieldController::tickPlayfield(const uint32_t delta_time, const uint32_t elapsed_time)
 {
-    // Skip first frame
-    if (elapsed_time == 0)
+    // Skip first frame or if game is paused
+    if (elapsed_time == 0 || gameIsPaused)
     {
+        stopwatch = elapsed_time;
         return;
     }
 
