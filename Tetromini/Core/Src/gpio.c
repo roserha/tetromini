@@ -69,7 +69,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pins : BTN_UP_Pin BTN_DOWN_Pin BTN_LEFT_Pin BTN_RIGHT_Pin */
   GPIO_InitStruct.Pin = BTN_UP_Pin|BTN_DOWN_Pin|BTN_LEFT_Pin|BTN_RIGHT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : OLED_CS_Pin OLED_DC_Pin */
@@ -82,7 +82,7 @@ void MX_GPIO_Init(void)
   /*Configure GPIO pins : BTN_CCW_Pin BTN_START_Pin BTN_POWER_Pin BTN_CW_Pin */
   GPIO_InitStruct.Pin = BTN_CCW_Pin|BTN_START_Pin|BTN_POWER_Pin|BTN_CW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : AUDIO_SHUTDOWN_Pin */
