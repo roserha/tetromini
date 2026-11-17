@@ -620,15 +620,6 @@ namespace {
     constexpr UBaseType_t kGamePriority = tskIDLE_PRIORITY + 2;   // 2 levels above idle (higher = more important)
     QueueHandle_t xGameInputQueue = NULL;                         // Input queue
 
-    typedef enum
-    {
-        SCREEN_MAINMENU,
-        SCREEN_EASTEREGG,
-        SCREEN_GAME,
-        SCREEN_LOW_BATTERY,
-        SCREEN_ERR
-    } Screen_t;
-
     Screen_t ScreenState = SCREEN_MAINMENU;
 
     void gameTask(void *)
@@ -869,7 +860,7 @@ namespace {
                                     xQueueSend(xAudioQueue, (void *)&noteToPlay, 0);
                                     break;
                                 case CMD_START_BTN:
-                                    if (mainmenuEasterEgg == 10)
+                                    if (mainmenuEasterEgg >= 5) // TODO: Move this back to 10 when R4 is shorted
                                     {
                                         ScreenState = SCREEN_EASTEREGG;
                                         xTaskNotify(xVideoTaskHandle, CMD_HIDE_MENU_INFO, eSetValueWithOverwrite);
@@ -928,48 +919,62 @@ namespace {
     }
     
     /////////////////////////////////////////////////////////////////////////
-    // Button ISR Callback
+    // Button Thread
     /////////////////////////////////////////////////////////////////////////
 
-    extern "C" void HAL_GPIO_EXTI_Callback(uint16_t gpioPin)
+    constexpr uint32_t    kButtonStackWords = 512;                  // stack depth in words (512 × 4 bytes = 2 KB)
+    StackType_t           buttonStack[kButtonStackWords];             // the task's own stack (32-bit words on Cortex-M)
+    StaticTask_t          buttonTcb;                                // FreeRTOS task control block for the task
+    constexpr UBaseType_t kButtonPriority = tskIDLE_PRIORITY + 3;   // 3 levels above idle (higher = more important)
+
+    static constexpr uint16_t kButtonPins[8] = {BTN_CCW_Pin, BTN_CW_Pin, BTN_UP_Pin, BTN_DOWN_Pin, BTN_LEFT_Pin, BTN_RIGHT_Pin, BTN_START_Pin, BTN_POWER_Pin};
+    static constexpr GPIO_TypeDef *kButtonChannels[8] = {GPIOB, GPIOB, GPIOC, GPIOC, GPIOC, GPIOC, GPIOB, GPIOB};
+    static constexpr CommandType_t kButtonCommands[8] = {CMD_ROT_CCW_BTN, CMD_ROT_CW_BTN, CMD_UP_BTN, CMD_DOWN_BTN, CMD_LEFT_BTN, CMD_RIGHT_BTN, CMD_START_BTN, CMD_POWER_BTN};
+
+    void buttonTask(void *)
     {
-        // ignore presses before queue is ready
-        if (xGameInputQueue == nullptr)
-            return;
-        
-        // Although we only receive the gpio pin number, since we connected them
-        // to different numbers, we can get away with using the number to find
-        // the port, since we never have PCx and PBx for the same x!
-        
-        // THIS ISN'T AN EXPRESS GUARANTEE IN OTHER CIRCUITS, but it is the case in this one mwehehehe
-        
-        // Since buttons are arranged as PC2, PC5, PC6, PC7, PB8, PB11, PB13 and PB14 at time of writing,
-        // we can get away with a "is this pin larger or equal to 8?" to swap port C for B!
-        
-        GPIO_TypeDef *port = (gpioPin >= BTN_CW_Pin) ? GPIOB : GPIOC;
-        GPIO_PinState state = HAL_GPIO_ReadPin(port, gpioPin);
-        
-        uint32_t info = (state != GPIO_PIN_SET) ? 1 : 0;
-        
-        Command_t inputCmd = {CMD_NO_OP, info, nullptr};
-        
-        switch (gpioPin)
+        // For readings, a 0 read means a flip, positive reads mean pressed (RESET) and negative reads mean lifted (SET)
+        // For practicality purposes, we won't store any consecutive readings higher than 125
+
+        uint8_t Button_Timeout[8];
+        bool Button_Pressed[8];
+        bool Last_Button_Pressed[8];
+
+        // Adding to queue passes by copy, so let's create our base command
+
+        Command_t inputCmd = {CMD_NO_OP, 0, nullptr};
+
+        for (;;)
         {
-            case BTN_CCW_Pin:   inputCmd.cmdType = CMD_ROT_CCW_BTN; break;
-            case BTN_CW_Pin:    inputCmd.cmdType = CMD_ROT_CW_BTN;  break;
-            case BTN_LEFT_Pin:  inputCmd.cmdType = CMD_LEFT_BTN;    break;
-            case BTN_RIGHT_Pin: inputCmd.cmdType = CMD_RIGHT_BTN;   break;
-            case BTN_UP_Pin:    inputCmd.cmdType = CMD_UP_BTN;      break;
-            case BTN_DOWN_Pin:  inputCmd.cmdType = CMD_DOWN_BTN;    break;
-            case BTN_START_Pin: inputCmd.cmdType = CMD_START_BTN;   break;
-            case BTN_POWER_Pin: inputCmd.cmdType = CMD_POWER_BTN;   break;
+            inputCmd = {CMD_NO_OP, 0, nullptr};
+
+            // Implementing Eager Debouncing
+            for (int i = 0; i < 8; i++)
+            {
+                Last_Button_Pressed[i] = Button_Pressed[i];
+                Button_Pressed[i] = HAL_GPIO_ReadPin(kButtonChannels[i], kButtonPins[i]) != GPIO_PIN_SET;
+
+                if (Button_Timeout[i] != 0)
+                {
+                    Button_Timeout[i]++;
+
+                    if (Button_Timeout[i] == 4)
+                        Button_Timeout[i] = 0;
+                }
+
+                if (Last_Button_Pressed[i] != Button_Pressed[i] && Button_Timeout[i] == 0)
+                {
+                    inputCmd.cmdType = kButtonCommands[i];
+                    inputCmd.cmdInfo = Button_Pressed[i] ? 1 : 0;
+                    xQueueSend(xGameInputQueue, (void *)&inputCmd, 0);
+                    Button_Timeout[i] = 1;
+                }
+
+            }
+
+            vTaskDelay(pdMS_TO_TICKS(5));
         }
-        
-        BaseType_t higherPriorityTaskWoken = pdFALSE;
-        xQueueSendFromISR(xGameInputQueue, (void *)&inputCmd, &higherPriorityTaskWoken);
-        portYIELD_FROM_ISR(higherPriorityTaskWoken);
-    }
- 
+    } 
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -1031,6 +1036,13 @@ extern "C" void app_init(void)
                                         videoStack, &videoTcb);
     configASSERT(video != nullptr);
     xVideoTaskHandle = video;
+
+    // Launch button task
+
+    TaskHandle_t button = xTaskCreateStatic(buttonTask, "button", kButtonStackWords,
+                                        nullptr, kButtonPriority,
+                                        buttonStack, &buttonTcb);
+    configASSERT(button != nullptr);
 
     // Launch game task
     TaskHandle_t game = xTaskCreateStatic(gameTask, "game", kGameStackWords,

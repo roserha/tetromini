@@ -53,3 +53,14 @@ typedef enum{
     OneEightyDeg = 0b10,
     NinetyDeg = 0b11
 } Spin_t;
+
+// Which screen Game Thread is looking at
+
+typedef enum
+{
+    SCREEN_MAINMENU,
+    SCREEN_EASTEREGG,
+    SCREEN_GAME,
+    SCREEN_LOW_BATTERY,
+    SCREEN_ERR
+} Screen_t;
