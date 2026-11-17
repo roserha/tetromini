@@ -12,19 +12,21 @@ The project consists of multiple parts. As of writing, the firmware that control
 
 Future developments may want to explore things such as:
 ### Firmware
-- [ ] Game over screens
-- [ ] High score tracking (?)
+- [ ] Delayed Auto Shift
+- [ ] Game over screen
 - [ ] Firmware Updates
+- [ ] High score tracking (?)
 ### Hardware
 - [ ] Rev 2 PCB 
   - [ ] Without Adafruit Feather and with on-board STM32F405
   - [ ] With a soft-latch power button through BTN_POWER instead of SW1
   - [ ] Removing RC filter (because of eager debouncing!)
+  - [ ] Audio Breakout pointing INSIDE to avoid hole in V1 
 - [ ] A custom enclosure shaped like a T-Block Tetromino
 
 ## Features
 - Sprite-based rendering
-- 4 directional inputs (move left, move right, soft drop, hard drop)
+- 4 directional button inputs (move left, move right, down = soft drop, up = hard drop)
 - Clockwise and counterclockwise rotation
 - Dynamic gravity and boosted score based on level
 - Combo points per consecutive line clears
@@ -32,6 +34,7 @@ Future developments may want to explore things such as:
 - Dropped pieces and 4 different line clear sound effects
 - Multi-channel soundtrack played via synthesized notes with custom notes system
 - Multithreaded parallel execution
+- Video Playback
 
 ## Firmware and Multithreading
 
@@ -48,7 +51,7 @@ sequenceDiagram
     participant Game as Game Thread
     participant Render as Render Thread
     participant Battery as Battery Level Thread
-    participant ButtonISR as Button Interrupts
+    participant Buttons as Button Thread
     participant Audio as Audio Thread
     participant Melody as Melody Thread
     participant Video as Video Thread
@@ -104,8 +107,9 @@ sequenceDiagram
             Battery->>App: Update voltage and percentage
         end
     and Buttons
-        loop Continuously
-            ButtonISR->>Game: Send input to buffer upon rising or falling edge
+        loop Every ~5ms
+            Buttons->>Buttons: Go through every button and query their GPIO pin
+            Buttons->>Game: If a button is not in ~20ms hybernation due to Eager Debounce, send input to Game Task
         end
     and Video
       loop Every 2s
@@ -230,6 +234,34 @@ classDiagram
     -currentSongMessage : uint32_t 
     -shouldSongLoop : bool 
     -main_song : std::array<uint32_t, 483> $
+  }
+
+  class DecoderController {
+    +initializeDecoder(const uint8_t fileId)
+    +decodeBlock(bool checkBufferA)
+    -decoder : zlib_turbo*
+        -_inflateBuffer_A : std::array<uint8_t, 36872>*
+        -_inflateBuffer_B : std::array<uint8_t, 36872>*
+        -_inflateBuffer : std::array<uint8_t, 36872>*
+        -inflateBufferPointsB : bool
+        -fileStartPointer : uint8_t const*
+        -fileEndPointer : uint8_t const*
+        -currentPointer : uint8_t const*
+        -currentIndex : uint8_t
+        -blockSize : uint16_t
+        -numBlocks : uint8_t
+  }
+
+  class VideoController {
+    +displayVideoFrame(std::array<uint8_t, 36872> *videoBuffer, uint16_t videoFrame) : bool
+    -inflateBufferPointsB : bool
+    -fileStartPointer : uint8_t const*
+    -currentPointer : uint8_t const*
+    -currentIndex : uint8_t
+    -blockSize : uint16_t
+    -numBlocks : uint8_t
+    -_frame_buffer : std::array<uint8_t, GraphicsController::kFrameBufferSize>*
+    -_xFrameBufferMutex : SemaphoreHandle_t*
   }
 
 SpritesController "1" ..> "1" GraphicsController
