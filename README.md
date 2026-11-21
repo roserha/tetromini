@@ -22,7 +22,6 @@ Future developments may want to explore things such as:
   - [ ] With a soft-latch power button through BTN_POWER instead of SW1
   - [ ] Removing RC filter (because of eager debouncing!)
   - [ ] Audio Breakout pointing INSIDE to avoid hole in V1 
-- [ ] A custom enclosure shaped like a T-Block Tetromino
 
 ## Features
 - Sprite-based rendering
