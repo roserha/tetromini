@@ -18,10 +18,14 @@ Future developments may want to explore things such as:
 - [ ] High score tracking (?)
 ### Hardware
 - [ ] Rev 2 PCB 
-  - [ ] Without Adafruit Feather and with on-board STM32F405
+  - [ ] Without Adafruit Feather and with on-board STM32F405 and MAX98357A.
   - [ ] With a soft-latch power button through BTN_POWER instead of SW1
   - [ ] Removing RC filter (because of eager debouncing!)
   - [ ] Audio Breakout pointing INSIDE to avoid hole in V1 
+- [ ] Enclosure
+  - [ ] Thinner & without audio breakout hole
+  - [ ] Tiny door in back to allow for swapping battery out without removing PCB
+  - [ ] Membrane/rubber buttons
 
 ## Features
 - Sprite-based rendering
@@ -336,6 +340,20 @@ Bill Of Materials for Rev 1a (last updated Oct 28th 2026):
 This was my first foray into PCB design! It wasn't too bad, but it did suffer from me assuming specifications on the Adafruit Feather. Given I wired BTN_ROT_CCW to RX/PB11, it has an additional 100K Ohm pull-up resistor per Adafruit's specs for the board. This means that R4 needs to be shorted for the button to work, because with a multimeter it was found that a button press only sends RX to 1.6V instead of ~0V.
 
 Besides that, I AM SO HAPPY WITH IT! IT IS SHAPED LIKE A T-BLOCK!! GAHH!! It's not visible within the enclosure, but I KNOW IT'S THERE!! I got the PCB from OSH Park, and I really liked it!
+
+This is small, but for the next version, I want to properly centralize the LCD's screen, because I centralized its PCB, not the actual screen.
+
+## V1 Enclosure
+
+I had done enclosures before, but this is the first time I've had to deal with also having inputs from a custom PCB into actual physical buttons (and a slider because of the Rev 1a PCB design), and there were way more challenges than I expected.
+
+This time having it done in PLA instead of ABS made it more brittle than I expected, which caused a few breakages in screw bosses :(. But the base is a really cool red color! I wound up 3D printing my own button "covers" (more like sticks that can hit the push buttons themselves), and I'm not a huge fan of this design, but it works in this version. I'm considering getting buttons with taller and fatter actuators such that hopefully they sit higher than the LCD screen, instead of the latter.
+
+I also made a severe lapse of attention in the PCB design such that the audio breakout board sticks OUT of it, and so the enclosure had to have a hole. It did help with having a little hole for my JLink's cable, but I'd rather not have that in the next version. Speaking of which, I wish I had a tiny backdoor in the back of the enclosure, because I now have to open it AND unscrew the PCB to remove the JLink or the battery. **VERY** inconvenient.
+
+The slider itself is also really short, and I couldn't come up with any shortcuts to have it more easily accessible, so now it just has a gaping hole where it is so I can slide it with a stick. Somehow ***EVEN MORE*** inconvenient. All the more reason to have a soft latch circuit with the `POWER` button.
+
+In addition, I miscalculated how large the USB-C port hole should be, which makes putting cables on it nigh impossible. It doesn't help that the USB-C port is also attached to the Feather, which isn't screwed into the PCB. This and other reasons push me to have Rev 2's PCB have an onboard STM32F405 and MAX98357A chips.
 
 ## Debugging
 Debugging is achieved live on the board using a Segger J-Link EDU! This project is purely for learning's sake, so yay!
